@@ -27,7 +27,6 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.brooklyn.api.entity.Entity;
@@ -36,16 +35,14 @@ import org.apache.brooklyn.api.entity.Group;
 import org.apache.brooklyn.api.mgmt.EntityManager;
 import org.apache.brooklyn.core.entity.Attributes;
 import org.apache.brooklyn.core.entity.Entities;
-import org.apache.brooklyn.core.entity.factory.EntityFactory;
 import org.apache.brooklyn.core.test.BrooklynAppLiveTestSupport;
+import org.apache.brooklyn.core.test.entity.TestEntity;
 import org.apache.brooklyn.entity.group.BasicGroup;
 import org.apache.brooklyn.entity.group.DynamicCluster;
-import org.apache.brooklyn.entity.proxy.nginx.NginxController;
-import org.apache.brooklyn.entity.proxy.nginx.UrlMapping;
-import org.apache.brooklyn.entity.proxy.nginx.UrlRewriteRule;
 import org.apache.brooklyn.entity.webapp.JavaWebAppService;
 import org.apache.brooklyn.entity.webapp.WebAppService;
 import org.apache.brooklyn.entity.webapp.tomcat.Tomcat8Server;
+import org.apache.brooklyn.location.localhost.LocalhostMachineProvisioningLocation;
 import org.apache.brooklyn.test.Asserts;
 import org.apache.brooklyn.test.HttpTestUtils;
 import org.apache.brooklyn.test.support.TestResourceUnavailableException;
@@ -53,7 +50,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-import org.apache.brooklyn.location.localhost.LocalhostMachineProvisioningLocation;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -161,6 +157,7 @@ public class NginxUrlMappingIntegrationTest extends BrooklynAppLiveTestSupport {
         // Confirm routes requests to the correct cluster
         // Do more than one request for each in-case just lucky with round-robin...
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 //cluster 0
                 for (int i = 0; i < 2; i++) {
@@ -234,6 +231,7 @@ public class NginxUrlMappingIntegrationTest extends BrooklynAppLiveTestSupport {
         // Confirm routes requests to the correct cluster
         // Do more than one request for each in-case just lucky with round-robin...
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 for (int i = 0; i < 2; i++) {
                     HttpTestUtils.assertContentContainsText("http://localhost:"+port+"/atC0", "Hello");
@@ -305,6 +303,7 @@ public class NginxUrlMappingIntegrationTest extends BrooklynAppLiveTestSupport {
         
         // check nginx forwards localhost1 to c1, and localhost to core group 
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 HttpTestUtils.assertContentContainsText("http://localhost1:"+port+"/hello-world", "Hello");
                 HttpTestUtils.assertHttpStatusCodeEquals("http://localhost1:"+port+"", 404);
@@ -337,6 +336,7 @@ public class NginxUrlMappingIntegrationTest extends BrooklynAppLiveTestSupport {
         
         // Confirm routes requests to the correct cluster
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 // health check
                 HttpTestUtils.assertContentContainsText("http://localhost1:"+port+"", "Hello");
@@ -386,6 +386,7 @@ public class NginxUrlMappingIntegrationTest extends BrooklynAppLiveTestSupport {
         
         // Wait for app-server to be responsive, and url-mapping to update its TARGET_ADDRESSES (through async subscription)
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 // Entities.dumpInfo(app);
                 assertEquals(u1.getAttribute(UrlMapping.TARGET_ADDRESSES).size(), 1);
@@ -405,6 +406,7 @@ public class NginxUrlMappingIntegrationTest extends BrooklynAppLiveTestSupport {
         // Also wait for TARGET_ADDRESSES to update
         assertAppServerRespondsEventually(c1jboss2);
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 assertEquals(u1.getAttribute(UrlMapping.TARGET_ADDRESSES).size(), 2);
             }});
@@ -414,6 +416,7 @@ public class NginxUrlMappingIntegrationTest extends BrooklynAppLiveTestSupport {
         //      This assertion isn't good enough to tell if it's been deployed.
         final String c1jboss2addr = c1jboss2.getAttribute(Attributes.HOSTNAME)+":"+c1jboss2.getAttribute(Attributes.HTTP_PORT);
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 String conf = nginx.getConfigFile();
                 assertTrue(conf.contains(c1jboss2addr), "could not find "+c1jboss2addr+" in:\n"+conf);
@@ -429,10 +432,7 @@ public class NginxUrlMappingIntegrationTest extends BrooklynAppLiveTestSupport {
     public void testUrlMappingWithEmptyCoreCluster() throws Exception {
         DynamicCluster nullCluster = app.createAndManageChild(EntitySpec.create(DynamicCluster.class)
             .configure("initialSize", 0)
-            .configure("factory", new EntityFactory<Entity>() {
-                public Entity newEntity(Map flags, Entity parent) {
-                    throw new UnsupportedOperationException();
-                }}));
+            .configure("membeSpec", EntitySpec.create(TestEntity.class)));
 
         DynamicCluster c0 = app.createAndManageChild(EntitySpec.create(DynamicCluster.class)
                 .configure("initialSize", 1)
@@ -459,6 +459,7 @@ public class NginxUrlMappingIntegrationTest extends BrooklynAppLiveTestSupport {
         // Confirm routes requests to the correct cluster
         // Do more than one request for each in-case just lucky with round-robin...
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 for (int i = 0; i < 2; i++) {
                     HttpTestUtils.assertContentContainsText("http://localhost:"+port+"/atC0/", "Hello");

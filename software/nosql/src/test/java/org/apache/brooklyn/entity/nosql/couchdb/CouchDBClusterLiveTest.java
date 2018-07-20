@@ -23,11 +23,9 @@ import static org.testng.Assert.assertEquals;
 import org.apache.brooklyn.api.entity.EntitySpec;
 import org.apache.brooklyn.api.location.Location;
 import org.apache.brooklyn.core.entity.Entities;
-import org.apache.brooklyn.core.entity.factory.ApplicationBuilder;
+import org.apache.brooklyn.core.entity.EntityAsserts;
 import org.apache.brooklyn.core.entity.trait.Startable;
-import org.apache.brooklyn.core.test.entity.TestApplication;
-import org.apache.brooklyn.test.EntityTestUtils;
-import org.testng.annotations.AfterMethod;
+import org.apache.brooklyn.core.test.BrooklynAppLiveTestSupport;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -40,24 +38,19 @@ import com.google.common.collect.Iterables;
  * Tests that a two node cluster can be started on Amazon EC2 and data written on one {@link CouchDBNode}
  * can be read from another, using the Astyanax API.
  */
-public class CouchDBClusterLiveTest {
+public class CouchDBClusterLiveTest extends BrooklynAppLiveTestSupport {
 
     // private String provider = "rackspace-cloudservers-uk";
     private String provider = "aws-ec2:eu-west-1";
 
-    protected TestApplication app;
     protected Location testLocation;
     protected CouchDBCluster cluster;
 
     @BeforeMethod(alwaysRun = true)
-    public void setup() {
-        app = ApplicationBuilder.newManagedApp(TestApplication.class);
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
         testLocation = app.getManagementContext().getLocationRegistry().getLocationManaged(provider);
-    }
-
-    @AfterMethod(alwaysRun = true)
-    public void shutdown() {
-        Entities.destroyAll(app.getManagementContext());
     }
 
     /**
@@ -72,14 +65,14 @@ public class CouchDBClusterLiveTest {
 
         app.start(ImmutableList.of(testLocation));
 
-        EntityTestUtils.assertAttributeEqualsEventually(cluster, CouchDBCluster.GROUP_SIZE, 2);
+        EntityAsserts.assertAttributeEqualsEventually(cluster, CouchDBCluster.GROUP_SIZE, 2);
         Entities.dumpInfo(app);
 
         CouchDBNode first = (CouchDBNode) Iterables.get(cluster.getMembers(), 0);
         CouchDBNode second = (CouchDBNode) Iterables.get(cluster.getMembers(), 1);
 
-        EntityTestUtils.assertAttributeEqualsEventually(first, Startable.SERVICE_UP, true);
-        EntityTestUtils.assertAttributeEqualsEventually(second, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(first, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(second, Startable.SERVICE_UP, true);
 
         JcouchdbSupport jcouchdbFirst = new JcouchdbSupport(first);
         JcouchdbSupport jcouchdbSecond = new JcouchdbSupport(second);

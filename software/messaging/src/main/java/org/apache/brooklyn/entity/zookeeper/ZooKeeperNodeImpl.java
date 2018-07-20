@@ -18,6 +18,13 @@
  */
 package org.apache.brooklyn.entity.zookeeper;
 
+import java.net.URI;
+
+import org.apache.brooklyn.core.entity.Attributes;
+import org.apache.brooklyn.core.location.access.BrooklynAccessUtils;
+
+import com.google.common.net.HostAndPort;
+
 /**
  * An {@link org.apache.brooklyn.api.entity.Entity} that represents a single standalone zookeeper instance.
  */
@@ -26,8 +33,27 @@ public class ZooKeeperNodeImpl extends AbstractZooKeeperImpl implements ZooKeepe
     public ZooKeeperNodeImpl() {}
 
     @Override
+    public void init() {
+        super.init();
+        // MY_ID was changed from a sensor to config. Publish it as a sensor to maintain
+        // compatibility with any blueprints that reference it.
+        Integer myId = config().get(MY_ID);
+        if (myId == null) {
+            throw new NullPointerException("Require value for " + MY_ID.getName());
+        }
+        sensors().set(MY_ID, myId);
+    }
+
+    @Override
     public Class<?> getDriverInterface() {
         return ZooKeeperDriver.class;
     }
 
+    @Override
+    protected void postStart() {
+        super.postStart();
+        HostAndPort hap = BrooklynAccessUtils.getBrooklynAccessibleAddress(this, sensors().get(ZOOKEEPER_PORT));
+        sensors().set(ZooKeeperNode.ZOOKEEPER_ENDPOINT, hap.toString());
+        sensors().set(Attributes.MAIN_URI, URI.create("zk://" +hap.toString()));
+    }
 }

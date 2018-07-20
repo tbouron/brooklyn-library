@@ -178,6 +178,7 @@ public class NginxControllerImpl extends AbstractControllerImpl implements Nginx
     public static class UrlMappingsMemberTrackerPolicy extends AbstractMembershipTrackingPolicy {
         @Override
         protected void onEntityEvent(EventType type, Entity entity) {
+            defaultHighlightAction(type, entity);
             // relies on policy-rebind injecting the implementation rather than the dynamic-proxy
             ((NginxControllerImpl)super.entity).updateNeeded();
         }
@@ -213,6 +214,7 @@ public class NginxControllerImpl extends AbstractControllerImpl implements Nginx
         return (NginxDriver) super.getDriver();
     }
 
+    @Override
     public void doExtraConfigurationDuringStart() {
         computePortsAndUrls();
         reconfigureService();
@@ -323,6 +325,7 @@ public class NginxControllerImpl extends AbstractControllerImpl implements Nginx
         return "Nginx";
     }
 
+    @Override
     public boolean appendSslConfig(String id,
             StringBuilder out,
             String prefix,

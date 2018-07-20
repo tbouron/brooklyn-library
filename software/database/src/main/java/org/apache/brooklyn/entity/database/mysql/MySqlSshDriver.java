@@ -140,6 +140,10 @@ public class MySqlSshDriver extends AbstractSoftwareProcessSshDriver implements 
         commands.add("echo installing extra packages");
         commands.add(installPackage(ImmutableMap.of("yum", "libgcc_s.so.1"), null));
         commands.add(installPackage(ImmutableMap.of("yum", "libaio.so.1 libncurses.so.5", "apt", "libaio1 libaio-dev"), null));
+        
+        // addresses https://issues.apache.org/jira/browse/BROOKLYN-300
+        commands.add(installPackage(ImmutableMap.of("yum", "perl", "apt", "perl"), null));
+        commands.add(installPackage(ImmutableMap.of("yum", "perl-Data-Dumper", "apt", "libdata-dumper-concise-perl"), null));
 
         // these deps are only needed on some OS versions but others don't need them
         commands.add(installPackage(ImmutableMap.of("yum", "libaio", "apt", "ia32-libs"), null));
@@ -182,6 +186,12 @@ public class MySqlSshDriver extends AbstractSoftwareProcessSshDriver implements 
                 boolean hasCreationScript = copyDatabaseCreationScript();
                 timer.waitForExpiryUnchecked();
 
+                /*
+                 * TODO: this should not assume that the password is blank.
+                 * There may be an existing setup specified by datadir which has an existing password. The changePassword function
+                 * has been altered to try the specified `mysql.password` or blank to allow for a fresh install or a specified datadir.
+                 * This fix addresses the problem short term, but it should be properly fixed in any re-implementation.
+                 */
                 changePassword("", getPassword());
 
                 if (hasCreationScript)
@@ -200,13 +210,22 @@ public class MySqlSshDriver extends AbstractSoftwareProcessSshDriver implements 
         }
     }
 
+    /**
+     * Updates the password, tries both the old and new password in-case the password has already been changed
+     * @param oldPass
+     * @param newPass
+     */
     @Override
     public void changePassword(String oldPass, String newPass) {
         DynamicTasks.queue(
             SshEffectorTasks.ssh(
                 "cd "+getRunDir(),
-                getBaseDir()+"/bin/mysqladmin --defaults-file="+getConfigFile()+" --password=" + oldPass + " password "+newPass)
-            .summary("setting password")
+                    BashCommands.alternatives(
+                            getBaseDir()+"/bin/mysqladmin --defaults-file="+getConfigFile()+" --password=" + oldPass + " password "+newPass,
+                            getBaseDir()+"/bin/mysqladmin --defaults-file="+getConfigFile()+" --password=" + newPass + " password "+newPass
+                    )
+                )
+            .summary("Checking and updating password")
             .requiringExitCodeZero());
     }
 

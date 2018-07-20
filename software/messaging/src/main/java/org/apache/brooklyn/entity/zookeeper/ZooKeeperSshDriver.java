@@ -54,25 +54,32 @@ public class ZooKeeperSshDriver extends JavaSoftwareProcessSshDriver implements 
         return entity.getConfig(ZooKeeperNode.ZOOKEEPER_CONFIG_TEMPLATE);
     }
 
-    protected int getMyId() {
-        return entity.getAttribute(ZooKeeperNode.MY_ID);
+    protected Integer getMyId() {
+        return entity.config().get(ZooKeeperNode.MY_ID);
     }
 
     // FIXME All for one, and one for all! If any node fails then we're stuck waiting for its hostname/port forever.
     // Need a way to terminate the wait based on the entity going on-fire etc.
     // FIXME Race in getMemebers. Should we change DynamicCluster.grow to create the members and only then call start on them all?
     public List<ZooKeeperServerConfig> getZookeeperServers() throws ExecutionException, InterruptedException {
-        ZooKeeperEnsemble ensemble = (ZooKeeperEnsemble) entity.getParent();
         List<ZooKeeperServerConfig> result = Lists.newArrayList();
 
-        for (Entity member : ensemble.getMembers()) {
-            Integer myid = Entities.attributeSupplierWhenReady(member, ZooKeeperNode.MY_ID).get();
-            String hostname = Entities.attributeSupplierWhenReady(member, ZooKeeperNode.HOSTNAME).get();
-            Integer port = Entities.attributeSupplierWhenReady(member, ZooKeeperNode.ZOOKEEPER_PORT).get();
-            Integer leaderPort = Entities.attributeSupplierWhenReady(member, ZooKeeperNode.ZOOKEEPER_LEADER_PORT).get();
-            Integer electionPort = Entities.attributeSupplierWhenReady(member, ZooKeeperNode.ZOOKEEPER_ELECTION_PORT).get();
-            result.add(new ZooKeeperServerConfig(myid, hostname, port, leaderPort, electionPort));
+        if (entity.getParent() instanceof ZooKeeperEnsemble) {
+            ZooKeeperEnsemble ensemble = (ZooKeeperEnsemble) entity.getParent();
+
+            for (Entity member : ensemble.getMembers()) {
+                Integer memberId = member.config().get(ZooKeeperNode.MY_ID);
+                if (memberId == null) {
+                    throw new IllegalStateException(member + " has null value for " + ZooKeeperNode.MY_ID);
+                }
+                String hostname = Entities.attributeSupplierWhenReady(member, ZooKeeperNode.SUBNET_HOSTNAME).get();
+                Integer port = Entities.attributeSupplierWhenReady(member, ZooKeeperNode.ZOOKEEPER_PORT).get();
+                Integer leaderPort = Entities.attributeSupplierWhenReady(member, ZooKeeperNode.ZOOKEEPER_LEADER_PORT).get();
+                Integer electionPort = Entities.attributeSupplierWhenReady(member, ZooKeeperNode.ZOOKEEPER_ELECTION_PORT).get();
+                result.add(new ZooKeeperServerConfig(memberId, hostname, port, leaderPort, electionPort));
+            }
         }
+
         return result;
     }
 

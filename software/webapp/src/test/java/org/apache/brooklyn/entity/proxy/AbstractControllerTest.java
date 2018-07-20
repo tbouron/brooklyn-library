@@ -22,6 +22,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 import java.net.Inet4Address;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -30,7 +31,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.brooklyn.api.entity.Entity;
-import org.apache.brooklyn.api.entity.EntityLocal;
 import org.apache.brooklyn.api.entity.EntitySpec;
 import org.apache.brooklyn.api.location.Location;
 import org.apache.brooklyn.api.location.LocationSpec;
@@ -39,8 +39,11 @@ import org.apache.brooklyn.api.location.MachineProvisioningLocation;
 import org.apache.brooklyn.api.location.NoMachinesAvailableException;
 import org.apache.brooklyn.api.sensor.AttributeSensor;
 import org.apache.brooklyn.core.entity.Attributes;
-import org.apache.brooklyn.core.entity.factory.EntityFactory;
+import org.apache.brooklyn.core.entity.EntityAsserts;
 import org.apache.brooklyn.core.entity.trait.Startable;
+import org.apache.brooklyn.core.location.HasSubnetHostname;
+import org.apache.brooklyn.core.location.Machines;
+import org.apache.brooklyn.core.location.PortRanges;
 import org.apache.brooklyn.core.test.BrooklynAppUnitTestSupport;
 import org.apache.brooklyn.core.test.entity.TestEntity;
 import org.apache.brooklyn.core.test.entity.TestEntityImpl;
@@ -53,6 +56,7 @@ import org.apache.brooklyn.util.collections.MutableMap;
 import org.apache.brooklyn.util.collections.MutableSet;
 import org.apache.brooklyn.util.core.flags.SetFromFlag;
 import org.apache.brooklyn.util.exceptions.Exceptions;
+import org.apache.brooklyn.util.guava.Maybe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeMethod;
@@ -77,7 +81,7 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
         super.setUp();
         
         List<SshMachineLocation> machines = new ArrayList<SshMachineLocation>();
-        for (int i=1; i<=10; i++) {
+        for (int i = 1; i <= 10; i++) {
             SshMachineLocation machine = mgmt.getLocationManager().createLocation(LocationSpec.create(SshMachineLocation.class)
                     .configure("address", Inet4Address.getByName("1.1.1."+i)));
             machines.add(machine);
@@ -85,13 +89,13 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
         loc = mgmt.getLocationManager().createLocation(LocationSpec.create(FixedListMachineProvisioningLocation.class)
                 .configure("machines", machines));
         
-        cluster = app.createAndManageChild(EntitySpec.create(DynamicCluster.class)
+        cluster = app.addChild(EntitySpec.create(DynamicCluster.class)
                 .configure("initialSize", 0)
-                .configure("factory", new ClusteredEntity.Factory()));
+                .configure("memberSpec", EntitySpec.create(TestEntity.class).impl(WebServerEntity.class)));
         
-        controller = app.createAndManageChild(EntitySpec.create(TrackingAbstractController.class)
+        controller = app.addChild(EntitySpec.create(TrackingAbstractController.class)
                 .configure("serverPool", cluster) 
-                .configure("portNumberSensor", ClusteredEntity.HTTP_PORT)
+                .configure("portNumberSensor", WebServerEntity.HTTP_PORT)
                 .configure("domain", "mydomain"));
         
         app.start(ImmutableList.of(loc));
@@ -114,9 +118,9 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
         // above may trigger error logged about no hostname, but should update again with the settings below
         
         log.info("setting mymachine:1234");
-        child.sensors().set(ClusteredEntity.HOSTNAME, "mymachine");
+        child.sensors().set(WebServerEntity.HOSTNAME, "mymachine");
         child.sensors().set(Attributes.SUBNET_HOSTNAME, "mymachine");
-        child.sensors().set(ClusteredEntity.HTTP_PORT, 1234);
+        child.sensors().set(WebServerEntity.HTTP_PORT, 1234);
         assertEventuallyExplicitAddressesMatch(ImmutableList.of("mymachine:1234"));
         
         /* a race failure has been observed, https://issues.apache.org/jira/browse/BROOKLYN-206
@@ -134,16 +138,16 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
          */
         
         log.info("setting mymachine2:1234");
-        child.sensors().set(ClusteredEntity.HOSTNAME, "mymachine2");
+        child.sensors().set(WebServerEntity.HOSTNAME, "mymachine2");
         child.sensors().set(Attributes.SUBNET_HOSTNAME, "mymachine2");
         assertEventuallyExplicitAddressesMatch(ImmutableList.of("mymachine2:1234"));
         
         log.info("setting mymachine2:1235");
-        child.sensors().set(ClusteredEntity.HTTP_PORT, 1235);
+        child.sensors().set(WebServerEntity.HTTP_PORT, 1235);
         assertEventuallyExplicitAddressesMatch(ImmutableList.of("mymachine2:1235"));
         
         log.info("clearing");
-        child.sensors().set(ClusteredEntity.HOSTNAME, null);
+        child.sensors().set(WebServerEntity.HOSTNAME, null);
         child.sensors().set(Attributes.SUBNET_HOSTNAME, null);
         assertEventuallyExplicitAddressesMatch(ImmutableList.<String>of());
     }
@@ -152,12 +156,12 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
     public void testUpdateCalledWithAddressesOfNewChildren() {
         // First child
         cluster.resize(1);
-        EntityLocal child = (EntityLocal) Iterables.getOnlyElement(cluster.getMembers());
+        Entity child = Iterables.getOnlyElement(cluster.getMembers());
         
         List<Collection<String>> u = Lists.newArrayList(controller.getUpdates());
         assertTrue(u.isEmpty(), "expected empty list but got "+u);
         
-        child.sensors().set(ClusteredEntity.HTTP_PORT, 1234);
+        child.sensors().set(WebServerEntity.HTTP_PORT, 1234);
         child.sensors().set(Startable.SERVICE_UP, true);
         assertEventuallyAddressesMatchCluster();
 
@@ -168,9 +172,9 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
             public void run() {
                 assertEquals(cluster.getMembers().size(), 2);
             }});
-        EntityLocal child2 = (EntityLocal) Iterables.getOnlyElement(MutableSet.builder().addAll(cluster.getMembers()).remove(child).build());
+        Entity child2 = Iterables.getOnlyElement(MutableSet.<Entity>builder().addAll(cluster.getMembers()).remove(child).build());
         
-        child2.sensors().set(ClusteredEntity.HTTP_PORT, 1234);
+        child2.sensors().set(WebServerEntity.HTTP_PORT, 1234);
         child2.sensors().set(Startable.SERVICE_UP, true);
         assertEventuallyAddressesMatchCluster();
         
@@ -189,8 +193,8 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
         // Get some children, so we can remove one...
         cluster.resize(2);
         for (Entity it: cluster.getMembers()) { 
-            ((EntityLocal)it).sensors().set(ClusteredEntity.HTTP_PORT, 1234);
-            ((EntityLocal)it).sensors().set(Startable.SERVICE_UP, true);
+            it.sensors().set(WebServerEntity.HTTP_PORT, 1234);
+            it.sensors().set(Startable.SERVICE_UP, true);
         }
         assertEventuallyAddressesMatchCluster();
 
@@ -205,17 +209,17 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
         // Get some children, so we can remove one...
         cluster.resize(2);
         for (Entity it: cluster.getMembers()) { 
-            ((EntityLocal)it).sensors().set(ClusteredEntity.HTTP_PORT, 1234);
-            ((EntityLocal)it).sensors().set(Startable.SERVICE_UP, true);
+            it.sensors().set(WebServerEntity.HTTP_PORT, 1234);
+            it.sensors().set(Startable.SERVICE_UP, true);
         }
         assertEventuallyAddressesMatchCluster();
 
         // Now unset host/port, and remove children
         // Note the unsetting of hostname is done in SoftwareProcessImpl.stop(), so this is realistic
         for (Entity it : cluster.getMembers()) {
-            ((EntityLocal)it).sensors().set(ClusteredEntity.HTTP_PORT, null);
-            ((EntityLocal)it).sensors().set(ClusteredEntity.HOSTNAME, null);
-            ((EntityLocal)it).sensors().set(Startable.SERVICE_UP, false);
+            it.sensors().set(WebServerEntity.HTTP_PORT, null);
+            it.sensors().set(WebServerEntity.HOSTNAME, null);
+            it.sensors().set(Startable.SERVICE_UP, false);
         }
         assertEventuallyAddressesMatch(ImmutableList.<Entity>of());
     }
@@ -224,7 +228,7 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
     public void testUsesHostAndPortSensor() throws Exception {
         controller = app.createAndManageChild(EntitySpec.create(TrackingAbstractController.class)
                 .configure("serverPool", cluster) 
-                .configure("hostAndPortSensor", ClusteredEntity.HOST_AND_PORT)
+                .configure("hostAndPortSensor", WebServerEntity.HOST_AND_PORT)
                 .configure("domain", "mydomain"));
         controller.start(Arrays.asList(loc));
         
@@ -239,7 +243,7 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
         // TODO Ugly sleep to allow AbstractController to detect node having been added
         Thread.sleep(100);
         
-        child.sensors().set(ClusteredEntity.HOST_AND_PORT, "mymachine:1234");
+        child.sensors().set(WebServerEntity.HOST_AND_PORT, "mymachine:1234");
         assertEventuallyExplicitAddressesMatch(ImmutableList.of("mymachine:1234"));
     }
 
@@ -248,8 +252,8 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
         try {
             TrackingAbstractController controller2 = app.createAndManageChild(EntitySpec.create(TrackingAbstractController.class)
                     .configure("serverPool", cluster) 
-                    .configure("hostAndPortSensor", ClusteredEntity.HOST_AND_PORT)
-                    .configure("hostnameSensor", ClusteredEntity.HOSTNAME)
+                    .configure("hostAndPortSensor", WebServerEntity.HOST_AND_PORT)
+                    .configure("hostnameSensor", WebServerEntity.HOSTNAME)
                     .configure("domain", "mydomain"));
             controller2.start(Arrays.asList(loc));
         } catch (Exception e) {
@@ -264,8 +268,8 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
         try {
             TrackingAbstractController controller3 = app.createAndManageChild(EntitySpec.create(TrackingAbstractController.class)
                     .configure("serverPool", cluster) 
-                    .configure("hostAndPortSensor", ClusteredEntity.HOST_AND_PORT)
-                    .configure("portNumberSensor", ClusteredEntity.HTTP_PORT)
+                    .configure("hostAndPortSensor", WebServerEntity.HOST_AND_PORT)
+                    .configure("portNumberSensor", WebServerEntity.HTTP_PORT)
                     .configure("domain", "mydomain"));
             controller3.start(Arrays.asList(loc));
         } catch (Exception e) {
@@ -300,19 +304,58 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
         assertTrue(u.isEmpty(), "expected no updates, but got "+u);
     }
 
+    @Test
+    public void testMainUriSensorsCorrectlyComputedWithDomain() throws Exception {
+        URI expected = URI.create("http://mydomain:8000/");
+
+        EntityAsserts.assertAttributeEquals(controller, TrackingAbstractController.MAIN_URI, expected);
+        EntityAsserts.assertAttributeEquals(controller, TrackingAbstractController.MAIN_URI_MAPPED_SUBNET, expected);
+        EntityAsserts.assertAttributeEquals(controller, TrackingAbstractController.MAIN_URI_MAPPED_PUBLIC, expected);
+    }
+
+    @Test
+    public void testMainUriSensorsCorrectlyComputedWithoutDomain() throws Exception {
+        // The MachineLocation needs to implement HasSubnetHostname for the Attributes.SUBNET_HOSTNAME 
+        // to be set with the subnet addresss (otherwise it will fall back to using machine.getAddress()).
+        // See Machines.getSubnetHostname. 
+        
+        TrackingAbstractController controller2 = app.addChild(EntitySpec.create(TrackingAbstractController.class)
+                .configure(TrackingAbstractController.SERVER_POOL, cluster)
+                .configure(TrackingAbstractController.PROXY_HTTP_PORT, PortRanges.fromInteger(8081))
+                .location(LocationSpec.create(SshMachineLocationWithSubnetHostname.class)
+                        .configure("address", Inet4Address.getByName("1.1.1.1"))
+                        .configure(SshMachineLocation.PRIVATE_ADDRESSES, ImmutableList.of("2.2.2.2"))));
+        controller2.start(ImmutableList.<Location>of());
+
+        EntityAsserts.assertAttributeEquals(controller2, Attributes.ADDRESS, "1.1.1.1");
+        EntityAsserts.assertAttributeEquals(controller2, Attributes.SUBNET_ADDRESS, "2.2.2.2");
+        EntityAsserts.assertAttributeEquals(controller2, Attributes.MAIN_URI, URI.create("http://2.2.2.2:8081/"));
+        EntityAsserts.assertAttributeEquals(controller2, Attributes.MAIN_URI_MAPPED_PUBLIC, URI.create("http://1.1.1.1:8081/"));
+        EntityAsserts.assertAttributeEquals(controller2, Attributes.MAIN_URI_MAPPED_SUBNET, URI.create("http://2.2.2.2:8081/"));
+    }
+    public static class SshMachineLocationWithSubnetHostname extends SshMachineLocation implements HasSubnetHostname {
+        @Override public String getSubnetHostname() {
+            return getSubnetIp();
+        }
+        @Override public String getSubnetIp() {
+            Set<String> addrs = getPrivateAddresses();
+            return (addrs.isEmpty()) ? getAddress().getHostAddress() : Iterables.get(addrs, 0);
+        }
+    }
+    
     private void assertEventuallyAddressesMatchCluster() {
         assertEventuallyAddressesMatch(cluster.getMembers());
     }
 
     private void assertEventuallyAddressesMatch(final Collection<Entity> expectedMembers) {
-        Asserts.succeedsEventually(MutableMap.of("timeout", 15000), new Runnable() {
+        Asserts.succeedsEventually(new Runnable() {
                 @Override public void run() {
                     assertAddressesMatch(locationsToAddresses(1234, expectedMembers));
                 }} );
     }
 
     private void assertEventuallyExplicitAddressesMatch(final Collection<String> expectedAddresses) {
-        Asserts.succeedsEventually(MutableMap.of("timeout", 15000), new Runnable() {
+        Asserts.succeedsEventually(new Runnable() {
             @Override public void run() {
                 assertAddressesMatch(expectedAddresses);
             }} );
@@ -329,24 +372,14 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
 
     private Collection<String> locationsToAddresses(int port, Collection<Entity> entities) {
         Set<String> result = MutableSet.of();
-        for (Entity e: entities) {
-            result.add( ((SshMachineLocation) e.getLocations().iterator().next()) .getAddress().getHostName()+":"+port);
+        for (Entity e : entities) {
+            SshMachineLocation machine = Machines.findUniqueMachineLocation(e.getLocations(), SshMachineLocation.class).get();
+            result.add(machine.getAddress().getHostName()+":"+port);
         }
         return result;
     }
 
-    public static class ClusteredEntity extends TestEntityImpl {
-        public static class Factory implements EntityFactory<ClusteredEntity> {
-            @Override
-            public ClusteredEntity newEntity(Map flags, Entity parent) {
-                return new ClusteredEntity(flags, parent);
-            }
-        }
-        public ClusteredEntity(Map flags, Entity parent) { super(flags,parent); }
-        public ClusteredEntity(Entity parent) { super(MutableMap.of(),parent); }
-        public ClusteredEntity(Map flags) { super(flags,null); }
-        public ClusteredEntity() { super(MutableMap.of(),null); }
-        
+    public static class WebServerEntity extends TestEntityImpl {
         @SetFromFlag("hostname")
         public static final AttributeSensor<String> HOSTNAME = Attributes.HOSTNAME;
         
@@ -356,10 +389,11 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
         @SetFromFlag("hostAndPort")
         public static final AttributeSensor<String> HOST_AND_PORT = Attributes.HOST_AND_PORT;
         
-        MachineProvisioningLocation provisioner;
+        MachineProvisioningLocation<MachineLocation> provisioner;
         
+        @Override
         public void start(Collection<? extends Location> locs) {
-            provisioner = (MachineProvisioningLocation) locs.iterator().next();
+            provisioner = (MachineProvisioningLocation<MachineLocation>) locs.iterator().next();
             MachineLocation machine;
             try {
                 machine = provisioner.obtain(MutableMap.of());
@@ -369,9 +403,16 @@ public class AbstractControllerTest extends BrooklynAppUnitTestSupport {
             addLocations(Arrays.asList(machine));
             sensors().set(HOSTNAME, machine.getAddress().getHostName());
             sensors().set(Attributes.SUBNET_HOSTNAME, machine.getAddress().getHostName());
+            sensors().set(Attributes.MAIN_URI_MAPPED_SUBNET, URI.create(machine.getAddress().getHostName()));
+            sensors().set(Attributes.MAIN_URI_MAPPED_PUBLIC, URI.create("http://8.8.8.8:" + sensors().get(HTTP_PORT)));
         }
+
+        @Override
         public void stop() {
-            if (provisioner!=null) provisioner.release((MachineLocation) firstLocation());
+            Maybe<MachineLocation> machine = Machines.findUniqueMachineLocation(getLocations(), MachineLocation.class);
+            if (provisioner != null) {
+                provisioner.release(machine.get());
+            }
         }
     }
 }

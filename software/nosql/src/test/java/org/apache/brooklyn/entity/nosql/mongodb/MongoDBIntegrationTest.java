@@ -22,12 +22,9 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 
 import org.apache.brooklyn.api.entity.EntitySpec;
-import org.apache.brooklyn.core.entity.Entities;
-import org.apache.brooklyn.core.entity.factory.ApplicationBuilder;
+import org.apache.brooklyn.core.entity.EntityAsserts;
 import org.apache.brooklyn.core.entity.trait.Startable;
-import org.apache.brooklyn.core.test.entity.TestApplication;
-import org.apache.brooklyn.test.EntityTestUtils;
-import org.testng.annotations.AfterMethod;
+import org.apache.brooklyn.core.test.BrooklynAppLiveTestSupport;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import org.apache.brooklyn.location.localhost.LocalhostMachineProvisioningLocation;
@@ -35,20 +32,17 @@ import org.apache.brooklyn.location.localhost.LocalhostMachineProvisioningLocati
 import com.google.common.collect.ImmutableList;
 import com.mongodb.DBObject;
 
-public class MongoDBIntegrationTest {
+// TODO Does it really need to be a live test? When converting from ApplicationBuilder, preserved
+// existing behaviour of using the live BrooklynProperties.
+public class MongoDBIntegrationTest extends BrooklynAppLiveTestSupport {
 
-    private TestApplication app;
     private LocalhostMachineProvisioningLocation localhostProvisioningLocation;
 
     @BeforeMethod(alwaysRun=true)
+    @Override
     public void setUp() throws Exception {
-        localhostProvisioningLocation = new LocalhostMachineProvisioningLocation();
-        app = ApplicationBuilder.newManagedApp(TestApplication.class);
-    }
-
-    @AfterMethod(alwaysRun=true)
-    public void tearDown() throws Exception {
-        if (app != null) Entities.destroyAll(app.getManagementContext());
+        super.setUp();
+        localhostProvisioningLocation = app.newLocalhostProvisioningLocation();
     }
 
     @Test(groups = "Integration")
@@ -57,7 +51,7 @@ public class MongoDBIntegrationTest {
                 .configure("mongodbConfTemplateUrl", "classpath:///test-mongodb.conf"));
         app.start(ImmutableList.of(localhostProvisioningLocation));
 
-        EntityTestUtils.assertAttributeEqualsEventually(entity, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(entity, Startable.SERVICE_UP, true);
         entity.stop();
         assertFalse(entity.getAttribute(Startable.SERVICE_UP));
     }
@@ -78,13 +72,13 @@ public class MongoDBIntegrationTest {
         MongoDBServer entity = app.createAndManageChild(EntitySpec.create(MongoDBServer.class)
                 .configure("mongodbConfTemplateUrl", "classpath:///test-mongodb.conf"));
         app.start(ImmutableList.of(localhostProvisioningLocation));
-        EntityTestUtils.assertAttributeEqualsEventually(entity, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(entity, Startable.SERVICE_UP, true);
 
-        EntityTestUtils.assertAttributeEventuallyNonNull(entity, MongoDBServer.OPCOUNTERS_INSERTS);
+        EntityAsserts.assertAttributeEventuallyNonNull(entity, MongoDBServer.OPCOUNTERS_INSERTS);
         Long initialInserts = entity.getAttribute(MongoDBServer.OPCOUNTERS_INSERTS);
         MongoDBTestHelper.insert(entity, "a", Boolean.TRUE);
         MongoDBTestHelper.insert(entity, "b", Boolean.FALSE);
-        EntityTestUtils.assertAttributeEqualsEventually(entity, MongoDBServer.OPCOUNTERS_INSERTS, initialInserts + 2);
+        EntityAsserts.assertAttributeEqualsEventually(entity, MongoDBServer.OPCOUNTERS_INSERTS, initialInserts + 2);
     }
 
 }

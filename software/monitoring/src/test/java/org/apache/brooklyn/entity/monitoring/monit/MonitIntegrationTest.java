@@ -29,7 +29,7 @@ import java.util.concurrent.Callable;
 
 import org.apache.brooklyn.api.entity.EntitySpec;
 import org.apache.brooklyn.api.location.MachineDetails;
-import org.apache.brooklyn.core.entity.Entities;
+import org.apache.brooklyn.core.entity.EntityAsserts;
 import org.apache.brooklyn.core.sensor.DependentConfiguration;
 import org.apache.brooklyn.core.test.BrooklynAppLiveTestSupport;
 import org.apache.brooklyn.entity.database.mysql.MySqlNode;
@@ -37,7 +37,6 @@ import org.apache.brooklyn.entity.software.base.SameServerEntity;
 import org.apache.brooklyn.entity.software.base.SoftwareProcess;
 import org.apache.brooklyn.location.localhost.LocalhostMachineProvisioningLocation;
 import org.apache.brooklyn.test.Asserts;
-import org.apache.brooklyn.test.EntityTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterMethod;
@@ -56,6 +55,7 @@ public class MonitIntegrationTest extends BrooklynAppLiveTestSupport {
     LocalhostMachineProvisioningLocation loc;
     Process testProcess;
     
+    @Override
     @BeforeMethod(alwaysRun=true)
     public void setUp() throws Exception {
         super.setUp();
@@ -81,7 +81,7 @@ public class MonitIntegrationTest extends BrooklynAppLiveTestSupport {
             .configure(MonitNode.CONTROL_FILE_URL, "classpath:///org/apache/brooklyn/entity/monitoring/monit/monit.monitrc"));
         app.start(ImmutableSet.of(loc));
         LOG.info("Monit started");
-        EntityTestUtils.assertAttributeEqualsEventually(monitNode, MonitNode.MONIT_TARGET_PROCESS_STATUS, "Running");
+        EntityAsserts.assertAttributeEqualsEventually(monitNode, MonitNode.MONIT_TARGET_PROCESS_STATUS, "Running");
     }
     
     @Test(groups = "Integration")
@@ -90,6 +90,7 @@ public class MonitIntegrationTest extends BrooklynAppLiveTestSupport {
         MySqlNode mySqlNode = sameServerEntity.addChild(EntitySpec.create(MySqlNode.class));
 
         Function<String, Map<String, Object>> controlFileSubstitutionsFunction = new Function<String, Map<String, Object>>() {
+            @Override
             public Map<String, Object> apply(String input) {
                 return ImmutableMap.<String, Object>of("targetPidFile", input);
             }
@@ -102,7 +103,7 @@ public class MonitIntegrationTest extends BrooklynAppLiveTestSupport {
 
         app.start(ImmutableSet.of(loc));
         LOG.info("Monit and MySQL started");
-        EntityTestUtils.assertAttributeEqualsEventually(monitNode, MonitNode.MONIT_TARGET_PROCESS_STATUS, "Running");
+        EntityAsserts.assertAttributeEqualsEventually(monitNode, MonitNode.MONIT_TARGET_PROCESS_STATUS, "Running");
         mySqlNode.stop();
         Asserts.succeedsEventually(new Runnable() {
             @Override
@@ -113,7 +114,7 @@ public class MonitIntegrationTest extends BrooklynAppLiveTestSupport {
             }
         });
         mySqlNode.restart();
-        EntityTestUtils.assertAttributeEqualsEventually(monitNode, MonitNode.MONIT_TARGET_PROCESS_STATUS, "Running");
+        EntityAsserts.assertAttributeEqualsEventually(monitNode, MonitNode.MONIT_TARGET_PROCESS_STATUS, "Running");
     }
     
     @Test(groups = "Integration")
@@ -121,6 +122,7 @@ public class MonitIntegrationTest extends BrooklynAppLiveTestSupport {
         // This runs on localhost; free to obtain another machine with impunity.
         final String osFlavor;
         MachineDetails machineDetails = app.getExecutionContext().submit(new Callable<MachineDetails>() {
+            @Override
             public MachineDetails call() throws Exception {
                 return loc.obtain().getMachineDetails();
             }}).get();
@@ -147,6 +149,7 @@ public class MonitIntegrationTest extends BrooklynAppLiveTestSupport {
             .configure(MySqlNode.DATA_DIR, mySqlDataDir));
 
         Function<String, Map<String, Object>> controlFileSubstitutionsFunction = new Function<String, Map<String, Object>>() {
+            @Override
             public Map<String, Object> apply(String input) {
                 return ImmutableMap.<String, Object>of(
                     "targetPidFile", input,
@@ -181,7 +184,7 @@ public class MonitIntegrationTest extends BrooklynAppLiveTestSupport {
             }
         });
         mySqlNode.stop();
-        EntityTestUtils.assertAttributeEqualsEventually(monitNode, MonitNode.MONIT_TARGET_PROCESS_STATUS, "Running");
+        EntityAsserts.assertAttributeEqualsEventually(monitNode, MonitNode.MONIT_TARGET_PROCESS_STATUS, "Running");
 
         // NOTE: Do not manually restart the mySqlNode, it should be restarted by monit
         Asserts.succeedsEventually(new Runnable() {

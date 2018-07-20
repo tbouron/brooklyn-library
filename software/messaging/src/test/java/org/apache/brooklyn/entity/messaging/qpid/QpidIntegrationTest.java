@@ -36,13 +36,11 @@ import javax.jms.TextMessage;
 import org.apache.brooklyn.api.entity.EntitySpec;
 import org.apache.brooklyn.api.location.Location;
 import org.apache.brooklyn.core.entity.Attributes;
-import org.apache.brooklyn.core.entity.Entities;
-import org.apache.brooklyn.core.entity.factory.ApplicationBuilder;
+import org.apache.brooklyn.core.entity.EntityAsserts;
 import org.apache.brooklyn.core.entity.trait.Startable;
-import org.apache.brooklyn.core.test.entity.TestApplication;
+import org.apache.brooklyn.core.test.BrooklynAppLiveTestSupport;
 import org.apache.brooklyn.entity.software.base.SoftwareProcess;
 import org.apache.brooklyn.test.Asserts;
-import org.apache.brooklyn.test.EntityTestUtils;
 import org.apache.brooklyn.test.HttpTestUtils;
 import org.apache.brooklyn.util.collections.MutableMap;
 import org.apache.brooklyn.util.exceptions.Exceptions;
@@ -50,7 +48,6 @@ import org.apache.qpid.client.AMQConnectionFactory;
 import org.apache.qpid.configuration.ClientProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -59,24 +56,21 @@ import com.google.common.collect.ImmutableList;
 /**
  * Test the operation of the {@link QpidBroker} class.
  */
-public class QpidIntegrationTest {
+// TODO Does it really need to be a live test? When converting from ApplicationBuilder, preserved
+// existing behaviour of using the live BrooklynProperties.
+public class QpidIntegrationTest extends BrooklynAppLiveTestSupport {
     private static final Logger log = LoggerFactory.getLogger(QpidIntegrationTest.class);
 
-    private TestApplication app;
     private Location testLocation;
     private QpidBroker qpid;
 
     @BeforeMethod(groups = "Integration")
-    public void setup() {
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
         String workingDir = System.getProperty("user.dir");
         log.info("Qpid working dir: {}", workingDir);
-        app = ApplicationBuilder.newManagedApp(TestApplication.class);
         testLocation = app.newLocalhostProvisioningLocation();
-    }
-
-    @AfterMethod(alwaysRun=true)
-    public void shutdown() {
-        if (app != null) Entities.destroyAll(app.getManagementContext());
     }
 
     /**
@@ -88,7 +82,7 @@ public class QpidIntegrationTest {
                 .configure("jmxPort", "9909+")
                 .configure("rmiRegistryPort", "9910+"));
         qpid.start(ImmutableList.of(testLocation));
-        EntityTestUtils.assertAttributeEqualsEventually(qpid, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(qpid, Startable.SERVICE_UP, true);
         qpid.stop();
         assertFalse(qpid.getAttribute(Startable.SERVICE_UP));
     }
@@ -101,7 +95,7 @@ public class QpidIntegrationTest {
         qpid = app.createAndManageChild(EntitySpec.create(QpidBroker.class)
                 .configure("httpManagementPort", "8888+"));
         qpid.start(ImmutableList.of(testLocation));
-        EntityTestUtils.assertAttributeEqualsEventually(qpid, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(qpid, Startable.SERVICE_UP, true);
         String httpUrl = "http://"+qpid.getAttribute(QpidBroker.HOSTNAME)+":"+qpid.getAttribute(QpidBroker.HTTP_MANAGEMENT_PORT)+"/management";
         HttpTestUtils.assertHttpStatusCodeEventuallyEquals(httpUrl, 200);
         // TODO check actual REST output
@@ -126,7 +120,7 @@ public class QpidIntegrationTest {
                 .configure(SoftwareProcess.RUNTIME_FILES, qpidRuntimeFiles)
                 .configure(QpidBroker.SUGGESTED_VERSION, "0.14"));
         qpid.start(ImmutableList.of(testLocation));
-        EntityTestUtils.assertAttributeEqualsEventually(qpid, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(qpid, Startable.SERVICE_UP, true);
         qpid.stop();
         assertFalse(qpid.getAttribute(Startable.SERVICE_UP));
     }
@@ -151,7 +145,7 @@ public class QpidIntegrationTest {
         qpid = app.createAndManageChild(EntitySpec.create(QpidBroker.class)
                 .configure("queue", queueName));
         qpid.start(ImmutableList.of(testLocation));
-        EntityTestUtils.assertAttributeEqualsEventually(qpid, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(qpid, Startable.SERVICE_UP, true);
 
         try {
             // Check queue created

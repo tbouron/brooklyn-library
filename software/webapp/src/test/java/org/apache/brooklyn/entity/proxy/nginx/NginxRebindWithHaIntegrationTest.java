@@ -87,11 +87,12 @@ public class NginxRebindWithHaIntegrationTest extends RebindTestFixtureWithApp {
         return "classpath://hello-world.war";
     }
 
+    @Override
     @BeforeMethod(alwaysRun=true)
     public void setUp() throws Exception {
         super.setUp();
         loc = origManagementContext.getLocationManager().createLocation(LocationSpec.create(LocalhostMachineProvisioningLocation.class)
-            .configure("address", Networking.getLocalHost())
+            .configure("address", Networking.getReachableLocalHost())
             .configure(SshMachineLocation.SSH_TOOL_CLASS, RecordingSshjTool.class.getName()));
         executor = Executors.newCachedThreadPool();
         
@@ -99,6 +100,7 @@ public class NginxRebindWithHaIntegrationTest extends RebindTestFixtureWithApp {
         BrooklynFeatureEnablement.setEnablement(BrooklynFeatureEnablement.FEATURE_FEED_REGISTRATION_PROPERTY, true);
     }
 
+    @Override
     @AfterMethod(alwaysRun=true)
     public void tearDown() throws Exception {
         try {
@@ -164,7 +166,7 @@ public class NginxRebindWithHaIntegrationTest extends RebindTestFixtureWithApp {
         newApp = (TestApplication) RebindTestUtils.rebind(
             RebindOptions.create().newManagementContext(newManagementContext).classLoader(classLoader));
 
-        NginxController newNginx = Iterables.getOnlyElement(Entities.descendants(newApp, NginxController.class));
+        NginxController newNginx = Iterables.getOnlyElement(Entities.descendantsAndSelf(newApp, NginxController.class));
         
         Collection<Feed> newFeeds = ((EntityInternal)newNginx).feeds().getFeeds();
         LOG.info("feeds after rebind are: "+newFeeds);

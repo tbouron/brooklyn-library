@@ -18,7 +18,6 @@
  */
 package org.apache.brooklyn.entity.proxy.nginx;
 
-import static org.apache.brooklyn.test.EntityTestUtils.assertAttributeEqualsEventually;
 import static org.apache.brooklyn.test.HttpTestUtils.assertHttpStatusCodeEquals;
 import static org.apache.brooklyn.test.HttpTestUtils.assertHttpStatusCodeEventuallyEquals;
 import static org.testng.Assert.assertFalse;
@@ -30,8 +29,9 @@ import java.util.Map;
 import org.apache.brooklyn.api.entity.Entity;
 import org.apache.brooklyn.api.entity.EntitySpec;
 import org.apache.brooklyn.api.location.Location;
-import org.apache.brooklyn.core.entity.factory.EntityFactory;
+import org.apache.brooklyn.core.entity.EntityAsserts;
 import org.apache.brooklyn.core.test.BrooklynAppLiveTestSupport;
+import org.apache.brooklyn.core.test.entity.TestEntity;
 import org.apache.brooklyn.entity.group.DynamicCluster;
 import org.apache.brooklyn.entity.software.base.SoftwareProcess;
 import org.apache.brooklyn.entity.webapp.JavaWebAppService;
@@ -79,18 +79,15 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
     public void testWhenNoServersReturns404() {
         serverPool = app.createAndManageChild(EntitySpec.create(DynamicCluster.class)
                 .configure("initialSize", 0)
-                .configure(DynamicCluster.FACTORY, new EntityFactory<Entity>() {
-                    @Override public Entity newEntity(Map flags, Entity parent) {
-                        throw new UnsupportedOperationException();
-                    }}));
+                .configure("memberSpec", EntitySpec.create(TestEntity.class)));
         
         nginx = app.createAndManageChild(EntitySpec.create(NginxController.class)
                 .configure("serverPool", serverPool)
                 .configure("domain", "localhost"));
         
         app.start(ImmutableList.of(localLoc));
-        
-        assertAttributeEqualsEventually(nginx, SoftwareProcess.SERVICE_UP, true);
+
+        EntityAsserts.assertAttributeEqualsEventually(nginx, SoftwareProcess.SERVICE_UP, true);
         assertHttpStatusCodeEventuallyEquals(nginx.getAttribute(NginxController.ROOT_URL), 404);
     }
 
@@ -98,10 +95,7 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
     public void testRestart() {
         serverPool = app.createAndManageChild(EntitySpec.create(DynamicCluster.class)
                 .configure("initialSize", 0)
-                .configure(DynamicCluster.FACTORY, new EntityFactory<Entity>() {
-                    @Override public Entity newEntity(Map flags, Entity parent) {
-                        throw new UnsupportedOperationException();
-                    }}));
+                .configure("memberSpec", EntitySpec.create(TestEntity.class)));
         
         nginx = app.createAndManageChild(EntitySpec.create(NginxController.class)
                 .configure("serverPool", serverPool)
@@ -110,8 +104,8 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
         app.start(ImmutableList.of(localLoc));
 
         nginx.restart();
-        
-        assertAttributeEqualsEventually(nginx, SoftwareProcess.SERVICE_UP, true);
+
+        EntityAsserts.assertAttributeEqualsEventually(nginx, SoftwareProcess.SERVICE_UP, true);
         assertHttpStatusCodeEventuallyEquals(nginx.getAttribute(NginxController.ROOT_URL), 404);
     }
 
@@ -134,6 +128,7 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
         
         // App-servers and nginx has started
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 for (Entity member : serverPool.getMembers()) {
                     assertTrue(member.getAttribute(SoftwareProcess.SERVICE_UP));
@@ -177,6 +172,7 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
 
         // App-servers and nginx has started
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 for (Entity member : serverPool.getMembers()) {
                     assertTrue(member.getAttribute(SoftwareProcess.SERVICE_UP));
@@ -218,11 +214,11 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
         app.start(ImmutableList.of(localLoc));
         
         // App-servers and nginx has started
-        assertAttributeEqualsEventually(serverPool, SoftwareProcess.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(serverPool, SoftwareProcess.SERVICE_UP, true);
         for (Entity member : serverPool.getMembers()) {
-            assertAttributeEqualsEventually(member, SoftwareProcess.SERVICE_UP, true);
+            EntityAsserts.assertAttributeEqualsEventually(member, SoftwareProcess.SERVICE_UP, true);
         }
-        assertAttributeEqualsEventually(nginx, SoftwareProcess.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(nginx, SoftwareProcess.SERVICE_UP, true);
 
         // URLs reachable
         assertHttpStatusCodeEventuallyEquals(nginx.getAttribute(NginxController.ROOT_URL), 200);
@@ -244,10 +240,7 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
     public void testTwoNginxesGetDifferentPorts() {
         serverPool = app.createAndManageChild(EntitySpec.create(DynamicCluster.class)
                 .configure("initialSize", 0)
-                .configure(DynamicCluster.FACTORY, new EntityFactory<Entity>() {
-                    @Override public Entity newEntity(Map flags, Entity parent) {
-                        throw new UnsupportedOperationException();
-                    }}));
+                .configure("memberSpec", EntitySpec.create(TestEntity.class)));
         
         NginxController nginx1 = app.createAndManageChild(EntitySpec.create(NginxController.class)
                 .configure("serverPool", serverPool)
@@ -269,8 +262,8 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
         assertNotEquals(url1, url2, "Two nginxs should listen on different ports, not both on "+url1);
         
         // Nginx has started
-        assertAttributeEqualsEventually(nginx1, SoftwareProcess.SERVICE_UP, true);
-        assertAttributeEqualsEventually(nginx2, SoftwareProcess.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(nginx1, SoftwareProcess.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(nginx2, SoftwareProcess.SERVICE_UP, true);
 
         // Nginx reachable (returning default 404)
         assertHttpStatusCodeEventuallyEquals(url1, 404);
@@ -292,6 +285,7 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
         app.start(ImmutableList.of(localLoc));
 
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 for (Entity member : serverPool.getMembers()) {
                     assertHttpStatusCodeEquals(member.getAttribute(WebAppService.ROOT_URL), 200);
@@ -354,6 +348,7 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
         final String nginxUrl = nginx.getAttribute(WebAppService.ROOT_URL);
 
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 for (Entity member : serverPool.getMembers()) {
                     String jbossUrl = member.getAttribute(WebAppService.ROOT_URL);
@@ -365,6 +360,7 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
         final String jbossUrl = Iterables.get(serverPool.getMembers(), 0).getAttribute(WebAppService.ROOT_URL);
         
         Thread t = new Thread(new Runnable() {
+            @Override
             public void run() {
                 long lastReportTime = System.currentTimeMillis();
                 int num = 0;
@@ -387,6 +383,7 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
         t.start();
         
         Thread t2 = new Thread(new Runnable() {
+            @Override
             public void run() {
                 long lastReportTime = System.currentTimeMillis();
                 int num = 0;
@@ -425,6 +422,7 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
         
         // App-servers and nginx has started
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 assertTrue(nginx.getAttribute(SoftwareProcess.SERVICE_UP));
             }});
@@ -436,6 +434,7 @@ public class NginxIntegrationTest extends BrooklynAppLiveTestSupport {
 
         Time.sleep(Duration.ONE_SECOND);
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 assertTrue(nginx.getAttribute(SoftwareProcess.SERVICE_UP));
             }});

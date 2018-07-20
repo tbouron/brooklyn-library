@@ -27,18 +27,19 @@ import org.apache.brooklyn.core.entity.Entities;
 import org.apache.brooklyn.core.mgmt.EntityManagementUtils;
 import org.apache.brooklyn.entity.dns.AbstractGeoDnsService;
 import org.apache.brooklyn.entity.group.DynamicFabric;
-import org.apache.brooklyn.util.stream.Streams;
 import org.testng.annotations.Test;
+
+import com.google.common.collect.Iterables;
 
 public class GeoDnsServiceYamlTest extends AbstractYamlTest {
 
     @Test
     public void testTargetGroupCanBeSetInYaml() throws Exception {
         final String resourceName = "classpath:/" + getClass().getPackage().getName().replace('.', '/') + "/geodns.yaml";
-        final String blueprint = Streams.readFully(loadYaml(resourceName));
+        final String blueprint = loadYaml(resourceName);
         Application app = EntityManagementUtils.createUnstarted(mgmt(), blueprint);
-        GeoscalingDnsService geodns = Entities.descendants(app, GeoscalingDnsService.class).iterator().next();
-        DynamicFabric fabric = Entities.descendants(app, DynamicFabric.class).iterator().next();
+        GeoscalingDnsService geodns = Iterables.getOnlyElement(Entities.descendantsAndSelf(app, GeoscalingDnsService.class));
+        DynamicFabric fabric = Iterables.getOnlyElement(Entities.descendantsAndSelf(app, DynamicFabric.class));
         assertEquals(geodns.config().get(AbstractGeoDnsService.ENTITY_PROVIDER), fabric);
     }
 

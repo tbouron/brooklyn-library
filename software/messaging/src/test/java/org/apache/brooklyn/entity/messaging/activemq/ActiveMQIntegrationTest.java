@@ -33,17 +33,14 @@ import javax.jms.TextMessage;
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.brooklyn.api.entity.EntitySpec;
 import org.apache.brooklyn.api.location.Location;
-import org.apache.brooklyn.core.entity.Entities;
-import org.apache.brooklyn.core.entity.factory.ApplicationBuilder;
+import org.apache.brooklyn.core.entity.EntityAsserts;
 import org.apache.brooklyn.core.entity.trait.Startable;
-import org.apache.brooklyn.core.test.entity.TestApplication;
+import org.apache.brooklyn.core.test.BrooklynAppLiveTestSupport;
 import org.apache.brooklyn.entity.java.UsesJmx;
 import org.apache.brooklyn.entity.java.UsesJmx.JmxAgentModes;
-import org.apache.brooklyn.test.EntityTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -53,22 +50,19 @@ import com.google.common.collect.ImmutableMap;
 /**
  * Test the operation of the {@link ActiveMQBroker} class.
  */
-public class ActiveMQIntegrationTest {
+// TODO Does it really need to be a live test? When converting from ApplicationBuilder, preserved
+// existing behaviour of using the live BrooklynProperties.
+public class ActiveMQIntegrationTest extends BrooklynAppLiveTestSupport {
     private static final Logger log = LoggerFactory.getLogger(ActiveMQIntegrationTest.class);
 
-    private TestApplication app;
     private Location testLocation;
     private ActiveMQBroker activeMQ;
 
     @BeforeMethod(alwaysRun = true)
-    public void setup() throws Exception {
-        app = ApplicationBuilder.newManagedApp(TestApplication.class);
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
         testLocation = app.newLocalhostProvisioningLocation();
-    }
-
-    @AfterMethod(alwaysRun = true)
-    public void shutdown() throws Exception {
-        if (app != null) Entities.destroyAll(app.getManagementContext());
     }
 
     /**
@@ -79,7 +73,7 @@ public class ActiveMQIntegrationTest {
         activeMQ = app.createAndManageChild(EntitySpec.create(ActiveMQBroker.class));
 
         activeMQ.start(ImmutableList.of(testLocation));
-        EntityTestUtils.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10*60*1000), activeMQ, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10*60*1000), activeMQ, Startable.SERVICE_UP, true);
         log.info("JMX URL is "+activeMQ.getAttribute(UsesJmx.JMX_URL));
         activeMQ.stop();
         assertFalse(activeMQ.getAttribute(Startable.SERVICE_UP));
@@ -95,7 +89,7 @@ public class ActiveMQIntegrationTest {
             .configure("jmxPort", "11099+"));
        
         activeMQ.start(ImmutableList.of(testLocation));
-        EntityTestUtils.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10*60*1000), activeMQ, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10*60*1000), activeMQ, Startable.SERVICE_UP, true);
         log.info("JMX URL is "+activeMQ.getAttribute(UsesJmx.JMX_URL));
         activeMQ.stop();
         assertFalse(activeMQ.getAttribute(Startable.SERVICE_UP));
@@ -108,7 +102,7 @@ public class ActiveMQIntegrationTest {
             .configure("brokerName", "bridge"));
 
         activeMQ.start(ImmutableList.of(testLocation));
-        EntityTestUtils.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10*60*1000), activeMQ, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10*60*1000), activeMQ, Startable.SERVICE_UP, true);
         log.info("JMX URL is "+activeMQ.getAttribute(UsesJmx.JMX_URL));
         activeMQ.stop();
         assertFalse(activeMQ.getAttribute(Startable.SERVICE_UP));
@@ -121,11 +115,11 @@ public class ActiveMQIntegrationTest {
         ActiveMQBroker activeMQ2 = app.createAndManageChild(EntitySpec.create(ActiveMQBroker.class));
 
         activeMQ1.start(ImmutableList.of(testLocation));
-        EntityTestUtils.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10*60*1000), activeMQ1, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10 * 60 * 1000), activeMQ1, Startable.SERVICE_UP, true);
         log.info("JMX URL is "+activeMQ1.getAttribute(UsesJmx.JMX_URL));
 
         activeMQ2.start(ImmutableList.of(testLocation));
-        EntityTestUtils.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10*60*1000), activeMQ2, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10*60*1000), activeMQ2, Startable.SERVICE_UP, true);
         log.info("JMX URL is "+activeMQ2.getAttribute(UsesJmx.JMX_URL));
     }
 
@@ -176,7 +170,7 @@ public class ActiveMQIntegrationTest {
             .configure(UsesJmx.JMX_AGENT_MODE, mode));
         
         activeMQ.start(ImmutableList.of(testLocation));
-        EntityTestUtils.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10*60*1000), activeMQ, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(ImmutableMap.of("timeout", 10 * 60 * 1000), activeMQ, Startable.SERVICE_UP, true);
 
         String jmxUrl = activeMQ.getAttribute(UsesJmx.JMX_URL);
         log.info("JMX URL ("+mode+") is "+jmxUrl);
@@ -198,16 +192,16 @@ public class ActiveMQIntegrationTest {
             // Connect to broker using JMS and send messages
             Connection connection = getActiveMQConnection(activeMQ);
             clearQueue(connection, queueName);
-            EntityTestUtils.assertAttributeEqualsEventually(queue, ActiveMQQueue.QUEUE_DEPTH_MESSAGES, 0);
+            EntityAsserts.assertAttributeEqualsEventually(queue, ActiveMQQueue.QUEUE_DEPTH_MESSAGES, 0);
             sendMessages(connection, number, queueName, content);
             // Check messages arrived
-            EntityTestUtils.assertAttributeEqualsEventually(queue, ActiveMQQueue.QUEUE_DEPTH_MESSAGES, number);
+            EntityAsserts.assertAttributeEqualsEventually(queue, ActiveMQQueue.QUEUE_DEPTH_MESSAGES, number);
 
             // Clear the messages
             assertEquals(clearQueue(connection, queueName), number);
 
             // Check messages cleared
-            EntityTestUtils.assertAttributeEqualsEventually(queue, ActiveMQQueue.QUEUE_DEPTH_MESSAGES, 0);
+            EntityAsserts.assertAttributeEqualsEventually(queue, ActiveMQQueue.QUEUE_DEPTH_MESSAGES, 0);
 
             connection.close();
 

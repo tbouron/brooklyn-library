@@ -19,9 +19,10 @@
 package org.apache.brooklyn.entity.nosql.couchdb;
 
 import org.apache.brooklyn.api.entity.EntitySpec;
+import org.apache.brooklyn.api.location.Location;
+import org.apache.brooklyn.core.entity.EntityAsserts;
 import org.apache.brooklyn.core.entity.trait.Startable;
-import org.apache.brooklyn.entity.nosql.couchdb.CouchDBNode;
-import org.apache.brooklyn.test.EntityTestUtils;
+import org.apache.brooklyn.core.test.BrooklynAppLiveTestSupport;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.ImmutableList;
@@ -31,8 +32,19 @@ import com.google.common.collect.ImmutableList;
  *
  * Test the operation of the {@link CouchDBNode} class.
  */
-public class CouchDBNodeIntegrationTest extends AbstractCouchDBNodeTest {
+// TODO Does it really need to be a live test? When converting from ApplicationBuilder, preserved
+// existing behaviour of using the live BrooklynProperties.
+public class CouchDBNodeIntegrationTest extends BrooklynAppLiveTestSupport {
 
+    Location testLocation;
+    CouchDBNode couchdb;
+    
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
+        testLocation = app.newLocalhostProvisioningLocation();
+    }
+    
     /**
      * Test that a node starts and sets SERVICE_UP correctly.
      */
@@ -42,11 +54,11 @@ public class CouchDBNodeIntegrationTest extends AbstractCouchDBNodeTest {
                 .configure("httpPort", "8000+"));
         app.start(ImmutableList.of(testLocation));
 
-        EntityTestUtils.assertAttributeEqualsEventually(couchdb, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(couchdb, Startable.SERVICE_UP, true);
 
         couchdb.stop();
 
-        EntityTestUtils.assertAttributeEquals(couchdb, Startable.SERVICE_UP, false);
+        EntityAsserts.assertAttributeEquals(couchdb, Startable.SERVICE_UP, false);
     }
 
     /**
@@ -58,7 +70,7 @@ public class CouchDBNodeIntegrationTest extends AbstractCouchDBNodeTest {
                 .configure("httpPort", "8000+"));
         app.start(ImmutableList.of(testLocation));
 
-        EntityTestUtils.assertAttributeEqualsEventually(couchdb, Startable.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(couchdb, Startable.SERVICE_UP, true);
 
         JcouchdbSupport jcouchdb = new JcouchdbSupport(couchdb);
         jcouchdb.jcouchdbTest();

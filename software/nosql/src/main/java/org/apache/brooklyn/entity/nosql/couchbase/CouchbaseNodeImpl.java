@@ -107,6 +107,7 @@ public class CouchbaseNodeImpl extends SoftwareProcessImpl implements CouchbaseN
         });
     }
 
+    @Override
     protected Map<String, Object> obtainProvisioningFlags(@SuppressWarnings("rawtypes") MachineProvisioningLocation location) {
         ConfigBag result = ConfigBag.newInstance(super.obtainProvisioningFlags(location));
         result.configure(CloudLocationConfig.OS_64_BIT, true);
@@ -201,6 +202,7 @@ public class CouchbaseNodeImpl extends SoftwareProcessImpl implements CouchbaseN
         }
     }
 
+    @Override
     public void connectSensors() {
         super.connectSensors();
         connectServiceUpIsRunning();
@@ -229,6 +231,7 @@ public class CouchbaseNodeImpl extends SoftwareProcessImpl implements CouchbaseN
             .build();
     }
 
+    @Override
     public void disconnectSensors() {
         super.disconnectSensors();
         disconnectServiceUpIsRunning();
@@ -252,7 +255,7 @@ public class CouchbaseNodeImpl extends SoftwareProcessImpl implements CouchbaseN
         if (toClusterO instanceof String) {
             toClusterO = getManagementContext().lookup((String)toClusterO);
         }
-        Entity toCluster = Tasks.resolving(toClusterO, Entity.class).context(getExecutionContext()).get();
+        Entity toCluster = Tasks.resolving(toClusterO, Entity.class).context(this).get();
 
         String fromBucket = Preconditions.checkNotNull( (String)ruleArgs.getStringKey("fromBucket"), "fromBucket must be specified" );
 

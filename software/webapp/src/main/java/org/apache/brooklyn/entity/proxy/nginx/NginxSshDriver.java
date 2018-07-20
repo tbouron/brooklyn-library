@@ -28,7 +28,6 @@ import org.apache.brooklyn.api.location.Location;
 import org.apache.brooklyn.api.location.OsDetails;
 import org.apache.brooklyn.api.mgmt.ManagementContext;
 import org.apache.brooklyn.core.entity.Attributes;
-import org.apache.brooklyn.core.entity.Entities;
 import org.apache.brooklyn.core.entity.EntityInternal;
 import org.apache.brooklyn.core.entity.lifecycle.Lifecycle;
 import org.apache.brooklyn.entity.proxy.AbstractController;
@@ -44,7 +43,6 @@ import org.apache.brooklyn.util.core.task.ssh.SshTasks;
 import org.apache.brooklyn.util.core.task.ssh.SshTasks.OnFailingTask;
 import org.apache.brooklyn.util.exceptions.Exceptions;
 import org.apache.brooklyn.util.net.Networking;
-import org.apache.brooklyn.util.os.Os;
 import org.apache.brooklyn.util.ssh.BashCommands;
 import org.apache.brooklyn.util.stream.Streams;
 import org.apache.brooklyn.util.text.Strings;
@@ -120,10 +118,10 @@ public class NginxSshDriver extends AbstractSoftwareProcessSshDriver implements 
         entity.sensors().set(NginxController.PID_FILE, getRunDir() + "/" + AbstractSoftwareProcessSshDriver.PID_FILENAME);
         if (((AbstractController)entity).isSsl()) {
             entity.sensors().set(Attributes.HTTPS_PORT, getPort());
-            ((EntityInternal)entity).removeAttribute(Attributes.HTTP_PORT);
+            ((EntityInternal)entity).sensors().remove(Attributes.HTTP_PORT);
         } else {
             entity.sensors().set(Attributes.HTTP_PORT, getPort());
-            ((EntityInternal)entity).removeAttribute(Attributes.HTTPS_PORT);
+            ((EntityInternal)entity).sensors().remove(Attributes.HTTPS_PORT);
         }
         super.postLaunch();
     }
@@ -167,6 +165,7 @@ public class NginxSshDriver extends AbstractSoftwareProcessSshDriver implements 
 
         List<String> cmds = Lists.newArrayList();
 
+        cmds.add(BashCommands.ifExecutableElse0("yum", BashCommands.sudo("yum -y install kernel-headers --disableexcludes=all")));
         cmds.add(BashCommands.INSTALL_TAR);
         cmds.add(BashCommands.alternatives(
                 BashCommands.ifExecutableElse0("apt-get", BashCommands.installPackage("build-essential")),

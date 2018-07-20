@@ -79,24 +79,25 @@ public class PostgreSqlRackspaceLiveTest extends PostgreSqlIntegrationTest {
         test("Red Hat Enterprise Linux 6");
     }
 
+    @Override
     @Test(groups = "Live")
     public void test_localhost() throws Exception {
         super.test_localhost();
     }
     
     public void test(String osRegex) throws Exception {
-        PostgreSqlNode psql = tapp.createAndManageChild(EntitySpec.create(PostgreSqlNode.class)
+        PostgreSqlNode psql = app.createAndManageChild(EntitySpec.create(PostgreSqlNode.class)
                 .configure(DatastoreCommon.CREATION_SCRIPT_CONTENTS, CREATION_SCRIPT)
                 .configure(PostgreSqlNode.POSTGRESQL_PORT, PortRanges.fromInteger(5432))
                 .configure(PostgreSqlNode.SHARED_MEMORY, "32MB"));
 
-        brooklynProperties.put("brooklyn.location.jclouds.rackspace-cloudservers-uk.imageNameRegex", osRegex);
-        brooklynProperties.remove("brooklyn.location.jclouds.rackspace-cloudservers-uk.image-id");
-        brooklynProperties.remove("brooklyn.location.jclouds.rackspace-cloudservers-uk.imageId");
-        brooklynProperties.put("brooklyn.location.jclouds.rackspace-cloudservers-uk.inboundPorts", Arrays.asList(22, 5432));
-        JcloudsLocation jcloudsLocation = (JcloudsLocation) managementContext.getLocationRegistry().getLocationManaged("jclouds:rackspace-cloudservers-uk");
+        mgmt.getBrooklynProperties().put("brooklyn.location.jclouds.rackspace-cloudservers-uk.imageNameRegex", osRegex);
+        mgmt.getBrooklynProperties().remove("brooklyn.location.jclouds.rackspace-cloudservers-uk.image-id");
+        mgmt.getBrooklynProperties().remove("brooklyn.location.jclouds.rackspace-cloudservers-uk.imageId");
+        mgmt.getBrooklynProperties().put("brooklyn.location.jclouds.rackspace-cloudservers-uk.inboundPorts", Arrays.asList(22, 5432));
+        JcloudsLocation jcloudsLocation = (JcloudsLocation) mgmt.getLocationRegistry().getLocationManaged("jclouds:rackspace-cloudservers-uk");
 
-        tapp.start(ImmutableList.of(jcloudsLocation));
+        app.start(ImmutableList.of(jcloudsLocation));
 
         SshMachineLocation l = (SshMachineLocation) psql.getLocations().iterator().next();
         l.execCommands("add iptables rule", ImmutableList.of(IptablesCommands.insertIptablesRule(Chain.INPUT, Protocol.TCP, 5432, Policy.ACCEPT)));

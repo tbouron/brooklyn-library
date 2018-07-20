@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.brooklyn.core.entity.Entities;
 import org.apache.brooklyn.entity.software.base.SoftwareProcess;
 import org.apache.brooklyn.entity.webapp.JavaWebAppSshDriver;
+import org.apache.brooklyn.util.text.Identifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.brooklyn.location.ssh.SshMachineLocation;
@@ -37,6 +38,7 @@ import org.apache.brooklyn.util.net.Networking;
 import org.apache.brooklyn.util.os.Os;
 import org.apache.brooklyn.util.ssh.BashCommands;
 import org.apache.brooklyn.util.text.Strings;
+import org.apache.brooklyn.util.time.Duration;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
@@ -109,6 +111,14 @@ public class JBoss7SshDriver extends JavaWebAppSshDriver implements JBoss7Driver
     }
 
     @Override
+    public boolean installJava() {
+        /*
+         * JBoss only works on Java 7 or lower, see here: https://developer.jboss.org/message/808212
+         */
+        return checkForAndInstallJava("1.7");
+    }
+
+    @Override
     public void install() {
         List<String> urls = resolver.getTargets();
         String saveAs = resolver.getFilename();
@@ -145,7 +155,7 @@ public class JBoss7SshDriver extends JavaWebAppSshDriver implements JBoss7Driver
         String managementPassword = getManagementPassword();
         if (Strings.isBlank(managementPassword)) {
             LOG.debug(this+" has no password specified for "+JBoss7Server.MANAGEMENT_PASSWORD.getName()+"; using a random string");
-            entity.config().set(JBoss7Server.MANAGEMENT_PASSWORD, Strings.makeRandomId(8));
+            entity.config().set(JBoss7Server.MANAGEMENT_PASSWORD, Identifiers.makeRandomPassword(8));
         }
         String hashedPassword = hashPassword(getManagementUsername(), getManagementPassword(), MANAGEMENT_REALM);
 
@@ -206,6 +216,7 @@ public class JBoss7SshDriver extends JavaWebAppSshDriver implements JBoss7Driver
                         "export LAUNCH_JBOSS_IN_BACKGROUND=true",
                         format("export JBOSS_HOME=%s", getExpandedInstallDir()),
                         format("export JBOSS_PIDFILE=%s/%s", getRunDir(), PID_FILENAME),
+                        "mv "+getRunDir()+"/console "+getRunDir()+"/console-$(date +\"%Y%m%d.%H%M.%S\") || true",
                         format("%s/bin/%s.sh ", getExpandedInstallDir(), SERVER_TYPE) +
                                 format("--server-config %s ", CONFIG_FILE) +
                                 format("-Djboss.server.base.dir=%s/%s ", getRunDir(), SERVER_TYPE) +
@@ -213,12 +224,7 @@ public class JBoss7SshDriver extends JavaWebAppSshDriver implements JBoss7Driver
                                 "-Djava.net.preferIPv4Stack=true " +
                                 "-Djava.net.preferIPv6Addresses=false " +
                                 format(" >> %s/console 2>&1 </dev/null &", getRunDir()),
-                        "for i in {1..10}\n" +
-                                "do\n" +
-                                "    grep -i 'starting' "+getRunDir()+"/console && exit\n" +
-                                "    sleep 1\n" +
-                                "done\n" +
-                                "echo \"Couldn't determine if process is running (console output does not contain 'starting'); continuing but may subsequently fail\""
+                        BashCommands.waitForFileContents("console", "starting", Duration.TEN_SECONDS, false)
                     )
                 .execute();
     }

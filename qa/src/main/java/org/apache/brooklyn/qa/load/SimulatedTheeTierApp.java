@@ -33,6 +33,7 @@ import org.apache.brooklyn.core.entity.Entities;
 import org.apache.brooklyn.core.entity.StartableApplication;
 import org.apache.brooklyn.core.entity.trait.Startable;
 import org.apache.brooklyn.core.location.PortRanges;
+import org.apache.brooklyn.core.sensor.DependentConfiguration;
 import org.apache.brooklyn.enricher.stock.Enrichers;
 import org.apache.brooklyn.entity.database.mysql.MySqlNode;
 import org.apache.brooklyn.entity.group.DynamicCluster;
@@ -95,7 +96,8 @@ public class SimulatedTheeTierApp extends AbstractApplication {
                         .configure(JavaWebAppService.ROOT_WAR, WAR_PATH)
                         .configure(JavaEntityMethods.javaSysProp("brooklyn.example.db.url"), 
                                 formatString("jdbc:%s%s?user=%s\\&password=%s", 
-                                        attributeWhenReady(mysql, MySqlNode.DATASTORE_URL), DB_TABLE, DB_USERNAME, DB_PASSWORD))
+                                        DependentConfiguration.builder().attributeWhenReady(mysql, MySqlNode.DATASTORE_URL).build(), 
+                                        DB_TABLE, DB_USERNAME, DB_PASSWORD))
                         .configure(DynamicCluster.INITIAL_SIZE, 2)
                         .configure(WebAppService.ENABLED_PROTOCOLS, ImmutableSet.of(USE_HTTPS ? "https" : "http")) );
 
@@ -103,7 +105,7 @@ public class SimulatedTheeTierApp extends AbstractApplication {
                 metric(DynamicWebAppCluster.REQUESTS_PER_SECOND_IN_WINDOW_PER_NODE).
                 metricRange(10, 100).
                 sizeRange(2, 5).
-                build());
+                buildSpec());
 
         enrichers().add(Enrichers.builder()
                 .propagating(Attributes.MAIN_URI, WebAppServiceConstants.ROOT_URL,

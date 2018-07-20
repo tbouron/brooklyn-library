@@ -20,14 +20,15 @@ package org.apache.brooklyn.entity.nosql.riak;
 
 import org.apache.brooklyn.api.entity.EntitySpec;
 import org.apache.brooklyn.api.location.Location;
+import org.apache.brooklyn.core.entity.EntityAsserts;
 import org.apache.brooklyn.entity.AbstractSoftlayerLiveTest;
-import org.apache.brooklyn.test.EntityTestUtils;
 import org.testng.annotations.BeforeMethod;
 
 import com.google.common.collect.ImmutableList;
 
 public class RiakNodeSoftlayerLiveTest extends AbstractSoftlayerLiveTest {
 
+    @Override
     @BeforeMethod(alwaysRun=true)
     public void setUp() throws Exception {
         super.setUp();
@@ -39,6 +40,6 @@ public class RiakNodeSoftlayerLiveTest extends AbstractSoftlayerLiveTest {
                 .configure(RiakNode.SUGGESTED_VERSION, "2.1.1"));
         app.start(ImmutableList.of(loc));
 
-        EntityTestUtils.assertAttributeEqualsEventually(entity, RiakNode.SERVICE_UP, true);
+        EntityAsserts.assertAttributeEqualsEventually(entity, RiakNode.SERVICE_UP, true);
     }
 }

@@ -40,13 +40,13 @@ import org.apache.brooklyn.camp.spi.PlatformRootSummary;
 import org.apache.brooklyn.camp.spi.collection.ResolvableLink;
 import org.apache.brooklyn.core.entity.Attributes;
 import org.apache.brooklyn.core.entity.Entities;
+import org.apache.brooklyn.core.entity.EntityAsserts;
 import org.apache.brooklyn.core.entity.lifecycle.Lifecycle;
 import org.apache.brooklyn.core.mgmt.BrooklynTaskTags;
 import org.apache.brooklyn.entity.webapp.DynamicWebAppCluster;
 import org.apache.brooklyn.entity.webapp.JavaWebAppService;
 import org.apache.brooklyn.entity.webapp.WebAppService;
 import org.apache.brooklyn.test.Asserts;
-import org.apache.brooklyn.test.EntityTestUtils;
 import org.apache.brooklyn.util.collections.MutableMap;
 import org.apache.brooklyn.util.core.ResourceUtils;
 import org.apache.brooklyn.util.exceptions.Exceptions;
@@ -100,7 +100,7 @@ public class JavaWebAppsIntegrationTest {
             Assert.assertEquals(app.getDisplayName(), "sample-single-jboss");
                         
             // locations set on AT in this yaml
-            Assert.assertEquals(app.getLocations().size(), 1);
+            Asserts.assertSize(app.getLocations(), 1);
 
             Set<Task<?>> tasks = BrooklynTaskTags.getTasksInEntityContext(brooklynMgmt.getExecutionManager(), app);
             log.info("Waiting on "+tasks.size()+" task(s)");
@@ -147,8 +147,8 @@ public class JavaWebAppsIntegrationTest {
             final Entity app = brooklynMgmt.getEntityManager().getEntity(assembly.getId());
             log.info("App - "+app);
             
-            // locations set on individual services here
-            Assert.assertEquals(app.getLocations().size(), 0);
+            // locations set on root node
+            Asserts.assertSize(app.getLocations(), 1);
             
             Iterator<ResolvableLink<PlatformComponent>> pcs = assembly.getPlatformComponents().links().iterator();
             PlatformComponent pc1 = pcs.next().resolve();
@@ -169,7 +169,7 @@ public class JavaWebAppsIntegrationTest {
             log.info("App started:");
             Entities.dumpInfo(app);
 
-            EntityTestUtils.assertAttributeEqualsEventually(app, Attributes.SERVICE_STATE_ACTUAL, Lifecycle.RUNNING);
+            EntityAsserts.assertAttributeEqualsEventually(app, Attributes.SERVICE_STATE_ACTUAL, Lifecycle.RUNNING);
             Assert.assertEquals(app.getAttribute(Attributes.SERVICE_UP), Boolean.TRUE);
             
             final String url = Asserts.succeedsEventually(MutableMap.of("timeout", Duration.TEN_SECONDS), new Callable<String>() {
@@ -208,8 +208,8 @@ public class JavaWebAppsIntegrationTest {
             final Entity app = brooklynMgmt.getEntityManager().getEntity(assembly.getId());
             log.info("App - "+app);
             
-            // locations set on individual services here
-            Assert.assertEquals(app.getLocations().size(), 0);
+            // locations set on root node
+            Asserts.assertSize(app.getLocations(), 1);
             
             Set<Task<?>> tasks = BrooklynTaskTags.getTasksInEntityContext(brooklynMgmt.getExecutionManager(), app);
             log.info("Waiting on "+tasks.size()+" task(s)");
@@ -238,11 +238,11 @@ public class JavaWebAppsIntegrationTest {
             Assert.assertEquals(policy.getConfig(AutoScalerPolicy.MAX_POOL_SIZE), (Integer)5);
             Assert.assertEquals(policy.getConfig(AutoScalerPolicy.MIN_POOL_SIZE), (Integer)1);
             Assert.assertEquals(policy.getConfig(AutoScalerPolicy.METRIC), DynamicWebAppCluster.REQUESTS_PER_SECOND_IN_WINDOW_PER_NODE);
-            Assert.assertEquals(policy.getConfig(AutoScalerPolicy.METRIC_LOWER_BOUND), (Integer)10);
-            Assert.assertEquals(policy.getConfig(AutoScalerPolicy.METRIC_UPPER_BOUND), (Integer)100);
+            Assert.assertEquals(policy.getConfig(AutoScalerPolicy.METRIC_LOWER_BOUND), 10);
+            Assert.assertEquals(policy.getConfig(AutoScalerPolicy.METRIC_UPPER_BOUND), 100);
             Assert.assertTrue(policy.isRunning());
 
-            EntityTestUtils.assertAttributeEqualsEventually(app, Attributes.SERVICE_STATE_ACTUAL, Lifecycle.RUNNING);
+            EntityAsserts.assertAttributeEqualsEventually(app, Attributes.SERVICE_STATE_ACTUAL, Lifecycle.RUNNING);
             Assert.assertEquals(app.getAttribute(Attributes.SERVICE_UP), Boolean.TRUE);
             
             final String url = Asserts.succeedsEventually(MutableMap.of("timeout", Duration.TEN_SECONDS), new Callable<String>() {

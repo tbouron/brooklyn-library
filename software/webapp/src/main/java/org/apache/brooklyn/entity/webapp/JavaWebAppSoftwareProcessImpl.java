@@ -21,12 +21,10 @@ package org.apache.brooklyn.entity.webapp;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.brooklyn.api.entity.Entity;
 import org.apache.brooklyn.core.annotation.Effector;
 import org.apache.brooklyn.core.annotation.EffectorParam;
 import org.apache.brooklyn.entity.java.JavaAppUtils;
@@ -41,25 +39,6 @@ public abstract class JavaWebAppSoftwareProcessImpl extends SoftwareProcessImpl 
 
     private static final Logger LOG = LoggerFactory.getLogger(JavaWebAppSoftwareProcessImpl.class);
 
-    public JavaWebAppSoftwareProcessImpl(){
-        super();
-    }
-
-    @SuppressWarnings("rawtypes")
-    public JavaWebAppSoftwareProcessImpl(Entity parent){
-        this(new LinkedHashMap(),parent);
-    }
-
-    @SuppressWarnings("rawtypes")
-    public JavaWebAppSoftwareProcessImpl(Map flags){
-        this(flags, null);
-    }
-
-    @SuppressWarnings("rawtypes")
-    public JavaWebAppSoftwareProcessImpl(Map flags, Entity parent) {
-        super(flags, parent);
-    }
-
     @Override
     public void init() {
         super.init();
@@ -69,6 +48,7 @@ public abstract class JavaWebAppSoftwareProcessImpl extends SoftwareProcessImpl 
     }
     
     //just provide better typing
+    @Override
     public JavaWebAppDriver getDriver() {
         return (JavaWebAppDriver) super.getDriver();
     }
@@ -118,6 +98,7 @@ public abstract class JavaWebAppSoftwareProcessImpl extends SoftwareProcessImpl 
      * @param url  where to get the war, as a URL, either classpath://xxx or file:///home/xxx or http(s)...
      * @param targetName  where to tell the server to serve the WAR, see above
      */
+    @Override
     @Effector(description="Deploys the given artifact, from a source URL, to a given deployment filename/context")
     public void deploy(
             @EffectorParam(name="url", description="URL of WAR file") String url, 
@@ -176,27 +157,33 @@ public abstract class JavaWebAppSoftwareProcessImpl extends SoftwareProcessImpl 
         sensors().set(REQUESTS_PER_SECOND_IN_WINDOW, 0D);
     }
 
+    @Override
     public boolean isHttpEnabled() {
         return WebAppServiceMethods.isProtocolEnabled(this, "HTTP");
     }
 
+    @Override
     public boolean isHttpsEnabled() {
         return WebAppServiceMethods.isProtocolEnabled(this, "HTTPS");
     }
 
+    @Override
     public Integer getHttpPort() {
         return getAttribute(HTTP_PORT);
     }
 
+    @Override
     public Integer getHttpsPort() {
         return getAttribute(HTTPS_PORT);
     }
 
+    @Override
     public String getHttpsSslKeyAlias() {
         HttpsSslConfig config = getAttribute(HTTPS_SSL_CONFIG);
         return (config == null) ? null : config.getKeyAlias();
     }
 
+    @Override
     public String getHttpsSslKeystorePassword() {
         HttpsSslConfig config = getAttribute(HTTPS_SSL_CONFIG);
         return (config == null) ? "" : config.getKeystorePassword();

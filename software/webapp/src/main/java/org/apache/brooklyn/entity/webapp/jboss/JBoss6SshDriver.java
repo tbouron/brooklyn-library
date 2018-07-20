@@ -37,6 +37,7 @@ import org.apache.brooklyn.util.collections.MutableMap;
 import org.apache.brooklyn.util.net.Networking;
 import org.apache.brooklyn.util.os.Os;
 import org.apache.brooklyn.util.ssh.BashCommands;
+import org.apache.brooklyn.util.time.Duration;
 
 public class JBoss6SshDriver extends JavaWebAppSshDriver implements JBoss6Driver {
 
@@ -53,10 +54,12 @@ public class JBoss6SshDriver extends JavaWebAppSshDriver implements JBoss6Driver
         return (JBoss6ServerImpl) super.getEntity();
     }
     
+    @Override
     protected String getLogFileLocation() {
         return Os.mergePathsUnix(getRunDir(), "server", SERVER_TYPE, "log/server.log");
     }
 
+    @Override
     protected String getDeploySubdir() {
         return Os.mergePathsUnix("server", SERVER_TYPE, "deploy");
     } // FIXME what is this in as6?
@@ -85,6 +88,14 @@ public class JBoss6SshDriver extends JavaWebAppSshDriver implements JBoss6Driver
     public void postLaunch() {
         entity.sensors().set(JBoss6Server.HTTP_PORT, DEFAULT_HTTP_PORT + getPortIncrement());
         super.postLaunch();
+    }
+
+    @Override
+    public boolean installJava() {
+        /*
+         * JBoss only works on Java 7 or lower, see here: https://developer.jboss.org/message/808212
+         */
+        return checkForAndInstallJava("1.7");
     }
 
     @Override
@@ -142,17 +153,13 @@ public class JBoss6SshDriver extends JavaWebAppSshDriver implements JBoss6Driver
                 .body.append(
                         format("export JBOSS_CLASSPATH=%s/lib/jboss-logmanager.jar",getExpandedInstallDir()),
                         format("export JBOSS_PIDFILE=%s/%s", getRunDir(), PID_FILENAME),
+                        "mv "+getRunDir()+"/console "+getRunDir()+"/console-$(date +\"%Y%m%d.%H%M.%S\") || true",
                         format("%s/bin/run.sh -Djboss.service.binding.set=%s -Djboss.server.base.dir=$RUN_DIR/server ",getExpandedInstallDir(),PORT_GROUP_NAME) +
                                 format("-Djboss.server.base.url=file://$RUN_DIR/server -Djboss.messaging.ServerPeerID=%s ",entity.getId())+
-                                format("-Djboss.boot.server.log.dir=%s/server/%s/log ",getRunDir(),SERVER_TYPE) +
-                                format("-b %s %s -c %s ", getBindAddress(), clusterArg,SERVER_TYPE) +
+                                format("-Djboss.boot.server.log.dir=%s/server/%s/log ", getRunDir(), SERVER_TYPE) +
+                                format("-b %s %s -c %s ", getBindAddress(), clusterArg, SERVER_TYPE) +
                                 ">>$RUN_DIR/console 2>&1 </dev/null &",
-                        "for i in {1..10}\n" +
-                                "do\n" +
-                                "    grep -i 'starting' "+getRunDir()+"/console && exit\n" +
-                                "    sleep 1\n" +
-                                "done\n" +
-                                "echo \"Couldn't determine if process is running (console output does not contain 'starting'); continuing but may subsequently fail\""
+                        BashCommands.waitForFileContents(getRunDir()+"/console", "Starting", Duration.TEN_SECONDS, false)
                     )
                 .execute();
     }

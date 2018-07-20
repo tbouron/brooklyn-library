@@ -18,9 +18,6 @@
  */
 package org.apache.brooklyn.entity.monitoring.monit;
 
-import java.util.Map;
-
-import org.apache.brooklyn.api.entity.Entity;
 import org.apache.brooklyn.api.location.Location;
 import org.apache.brooklyn.entity.software.base.SoftwareProcessImpl;
 import org.apache.brooklyn.feed.ssh.SshFeed;
@@ -28,7 +25,6 @@ import org.apache.brooklyn.feed.ssh.SshPollConfig;
 import org.apache.brooklyn.feed.ssh.SshPollValue;
 import org.apache.brooklyn.location.ssh.SshMachineLocation;
 import org.apache.brooklyn.util.text.Strings;
-import org.apache.brooklyn.util.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,17 +37,6 @@ public class MonitNodeImpl extends SoftwareProcessImpl implements MonitNode {
     
     private SshFeed feed;
     
-    public MonitNodeImpl() {
-    }
-    
-    public MonitNodeImpl(Map<?,?> flags) {
-        super(flags, null);
-    }
-    
-    public MonitNodeImpl(Map<?,?> flags, Entity parent) {
-        super(flags, parent);
-    }
-
     @Override
     public Class<? extends MonitDriver> getDriverInterface() {
         return MonitDriver.class;
@@ -71,7 +56,7 @@ public class MonitNodeImpl extends SoftwareProcessImpl implements MonitNode {
             String cmd = getDriver().getStatusCmd();
             feed = SshFeed.builder()
                 .entity(this)
-                .period(Duration.FIVE_SECONDS)
+                .period(config().get(SERVICE_PROCESS_IS_RUNNING_POLL_PERIOD))
                 .machine((SshMachineLocation) machine)
                 .poll(new SshPollConfig<Boolean>(SERVICE_UP)
                     .command(cmd)

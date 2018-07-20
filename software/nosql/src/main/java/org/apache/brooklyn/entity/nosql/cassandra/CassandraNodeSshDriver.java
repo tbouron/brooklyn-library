@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.brooklyn.api.entity.Entity;
-import org.apache.brooklyn.api.entity.EntityLocal;
 import org.apache.brooklyn.api.location.Location;
 import org.apache.brooklyn.api.mgmt.TaskWrapper;
 import org.apache.brooklyn.core.effector.ssh.SshEffectorTasks;
@@ -263,10 +262,10 @@ public class CassandraNodeSshDriver extends JavaSoftwareProcessSshDriver impleme
                 queuedStart = root.getAttribute(CassandraDatacenter.QUEUED_START_NODES);
                 if (queuedStart==null) {
                     queuedStart = new ArrayList<Entity>();
-                    ((EntityLocal)root).sensors().set(CassandraDatacenter.QUEUED_START_NODES, queuedStart);
+                    root.sensors().set(CassandraDatacenter.QUEUED_START_NODES, queuedStart);
                 }
                 queuedStart.add(getEntity());
-                ((EntityLocal)root).sensors().set(CassandraDatacenter.QUEUED_START_NODES, queuedStart);
+                root.sensors().set(CassandraDatacenter.QUEUED_START_NODES, queuedStart);
             }
             do {
                 // get it again in case it is backed by something external
@@ -301,12 +300,12 @@ public class CassandraNodeSshDriver extends JavaSoftwareProcessSshDriver impleme
                     Tasks.setBlockingDetails("Pausing to ensure Cassandra (singleton) has started before running creation script");
                     Time.sleep(Duration.seconds(20));
                     Tasks.resetBlockingDetails();
-                    executeScriptAsync(Streams.readFullyString(creationScript));
+                    executeScriptAsync(Streams.readFullyStringAndClose(creationScript));
                 }
             }
             if (isClustered() && isFirst) {
                 for (Entity ancestor: getCassandraAncestors()) {
-                    ((EntityLocal)ancestor).sensors().set(CassandraDatacenter.FIRST_NODE_STARTED_TIME_UTC, System.currentTimeMillis());
+                    ancestor.sensors().set(CassandraDatacenter.FIRST_NODE_STARTED_TIME_UTC, System.currentTimeMillis());
                 }
             }
         } finally {

@@ -20,7 +20,6 @@ package org.apache.brooklyn.entity.cm.salt;
 
 import com.google.common.collect.ImmutableSet;
 import org.apache.brooklyn.api.entity.EntitySpec;
-import org.apache.brooklyn.entity.cm.salt.impl.SaltHighstate;
 import org.apache.brooklyn.core.entity.Entities;
 import org.apache.brooklyn.core.sensor.Sensors;
 import org.apache.brooklyn.core.test.entity.TestApplication;
@@ -49,7 +48,7 @@ public class HighstateTest {
 
     @AfterMethod(alwaysRun=true)
     public void tearDown() {
-        if ( app != null) {
+        if (app != null) {
             Entities.destroyAll(app.getManagementContext());
             app = null;
         }
@@ -58,7 +57,7 @@ public class HighstateTest {
     @Test
     public void shouldSetSensorsOnEntity() throws Exception {
         String contents = getTestYaml();
-        TestApplication app = TestApplication.Factory.newManagedInstanceForTests();
+        app = TestApplication.Factory.newManagedInstanceForTests();
         entity = app.createAndManageChild(EntitySpec.create(SaltEntity.class)
             .configure(SaltEntity.START_STATES, ImmutableSet.of("apache")));
 
@@ -89,6 +88,6 @@ public class HighstateTest {
     private String getTestYaml() {
         final ResourceUtils resourceUtils = ResourceUtils.create();
         final InputStream yaml = resourceUtils.getResourceFromUrl("classpath://test-highstate.yaml");
-        return Streams.readFullyString(yaml);
+        return Streams.readFullyStringAndClose(yaml);
     }
 }

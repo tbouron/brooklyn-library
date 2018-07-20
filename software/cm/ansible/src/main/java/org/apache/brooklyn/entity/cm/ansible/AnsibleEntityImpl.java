@@ -18,42 +18,77 @@
  */
 package org.apache.brooklyn.entity.cm.ansible;
 
-import org.apache.brooklyn.entity.stock.EffectorStartableImpl;
-import org.apache.brooklyn.util.core.task.DynamicTasks;
+import org.apache.brooklyn.core.location.Locations;
+import org.apache.brooklyn.entity.software.base.SoftwareProcessImpl;
+import org.apache.brooklyn.feed.ssh.SshFeed;
+import org.apache.brooklyn.feed.ssh.SshPollConfig;
+import org.apache.brooklyn.location.ssh.SshMachineLocation;
 import org.apache.brooklyn.util.core.task.system.ProcessTaskWrapper;
-import org.apache.brooklyn.util.text.Strings;
+import org.apache.brooklyn.util.guava.Maybe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+public class AnsibleEntityImpl extends SoftwareProcessImpl implements AnsibleEntity {
 
-public class AnsibleEntityImpl extends EffectorStartableImpl implements AnsibleEntity {
+    private static final Logger LOG = LoggerFactory.getLogger(AnsibleEntityImpl.class);
 
-    private AnsibleLifecycleEffectorTasks lifecycleTasks;
+    private SshFeed feed;
 
-    public void init() {
-        checkNotNull(getConfig(SERVICE_NAME), "service name is missing. it has to be provided by the user");
-        String playbookName = getConfig(ANSIBLE_PLAYBOOK);
-        if (!Strings.isBlank(playbookName)) setDefaultDisplayName(playbookName + " (ansible)");
-
-        super.init();
-
-        lifecycleTasks = new AnsibleLifecycleEffectorTasks();
-
-        lifecycleTasks.attachLifecycleEffectors(this);
+    @Override
+    public Class getDriverInterface() {
+        return AnsibleEntityDriver.class;
     }
 
+    @Override
+    public AnsibleEntityDriver getDriver() {
+        return (AnsibleEntityDriver) super.getDriver();
+    }
+
+    @Override
+    protected void connectSensors() {
+        super.connectSensors();
+
+        Maybe<SshMachineLocation> machine = Locations.findUniqueSshMachineLocation(getLocations());
+
+        if (machine.isPresent()) {
+            String cmd = getDriver().getStatusCmd();
+            feed = SshFeed.builder()
+                    .entity(this)
+                    .period(config().get(SERVICE_PROCESS_IS_RUNNING_POLL_PERIOD))
+                    .machine(machine.get())
+                    .poll(new SshPollConfig<Boolean>(SERVICE_UP)
+                            .command(cmd)
+                            .setOnSuccess(true)
+                            .setOnFailureOrException(false))
+                    .build();
+        } else {
+            LOG.warn("Location(s) {} not an ssh-machine location, so not polling for status; setting serviceUp immediately", getLocations());
+            sensors().set(SERVICE_UP, true);
+        }
+    }
+
+    @Override
+    protected void disconnectSensors() {
+        if (feed != null) feed.stop();
+        super.disconnectSensors();
+    }
+
+    @Override
     public void populateServiceNotUpDiagnostics() {
         // TODO no-op currently; should check ssh'able etc
     }
 
+    @Override
     public String ansibleCommand(String module, String args) {
-        final ProcessTaskWrapper<Integer> command = DynamicTasks.queue(
-            AnsiblePlaybookTasks.moduleCommand(module, config().get(ANSIBLE_VARS), lifecycleTasks.getRunDir(), args));
+        final ProcessTaskWrapper<Integer> command = getDriver().ansibleCommand(module, args);
+
         command.asTask().blockUntilEnded();
+
         if (0 == command.getExitCode()) {
             return command.getStdout();
         } else {
             throw new RuntimeException("Command (" + args + ") in module " + module
-                + " failed with stderr:\n" + command.getStderr() + "\n");
+                    + " failed with stderr:\n" + command.getStderr() + "\n");
         }
     }
 }

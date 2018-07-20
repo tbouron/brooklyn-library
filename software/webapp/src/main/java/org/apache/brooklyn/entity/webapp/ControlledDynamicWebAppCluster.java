@@ -27,7 +27,6 @@ import org.apache.brooklyn.api.sensor.AttributeSensor;
 import org.apache.brooklyn.config.ConfigKey;
 import org.apache.brooklyn.core.config.ConfigKeys;
 import org.apache.brooklyn.core.entity.Attributes;
-import org.apache.brooklyn.core.entity.factory.ConfigurableEntityFactory;
 import org.apache.brooklyn.core.entity.lifecycle.Lifecycle;
 import org.apache.brooklyn.core.entity.trait.MemberReplaceable;
 import org.apache.brooklyn.core.entity.trait.Resizable;
@@ -60,7 +59,7 @@ import org.apache.brooklyn.util.core.flags.SetFromFlag;
 @Catalog(name="Controlled Dynamic Web-app Cluster", description="A cluster of load-balanced web-apps, which can be dynamically re-sized")
 @ImplementedBy(ControlledDynamicWebAppClusterImpl.class)
 public interface ControlledDynamicWebAppCluster extends DynamicGroup, Entity, Startable, Resizable, MemberReplaceable,
-        Group, ElasticJavaWebAppService, JavaWebAppService.CanDeployAndUndeploy, JavaWebAppService.CanRedeployAll {
+        Group, JavaWebAppService, JavaWebAppService.CanDeployAndUndeploy, JavaWebAppService.CanRedeployAll {
     
     @SetFromFlag("initialSize")
     public static ConfigKey<Integer> INITIAL_SIZE = ConfigKeys.newConfigKeyWithDefault(Cluster.INITIAL_SIZE, 1);
@@ -77,12 +76,6 @@ public interface ControlledDynamicWebAppCluster extends DynamicGroup, Entity, St
     @SetFromFlag("controllerSpec")
     public static BasicAttributeSensorAndConfigKey<EntitySpec<? extends LoadBalancer>> CONTROLLER_SPEC = new BasicAttributeSensorAndConfigKey(
             EntitySpec.class, "controlleddynamicwebappcluster.controllerSpec", "Spec for creating the controller (if one not supplied explicitly); if null an NGINX instance will be created");
-
-    @SuppressWarnings({ "unchecked", "rawtypes", "deprecation" })
-    /** factory (or closure) to create the web server, given flags */
-    @SetFromFlag("factory")
-    public static BasicAttributeSensorAndConfigKey<ConfigurableEntityFactory<? extends WebAppService>> FACTORY = new BasicAttributeSensorAndConfigKey(
-            ConfigurableEntityFactory.class, DynamicCluster.FACTORY.getName(), "factory (or closure) to create the web server");
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
     /** Spec for web server entiites to be created */
@@ -104,8 +97,6 @@ public interface ControlledDynamicWebAppCluster extends DynamicGroup, Entity, St
 
     
     public LoadBalancer getController();
-    
-    public ConfigurableEntityFactory<WebAppService> getFactory();
     
     public DynamicWebAppCluster getCluster();
     

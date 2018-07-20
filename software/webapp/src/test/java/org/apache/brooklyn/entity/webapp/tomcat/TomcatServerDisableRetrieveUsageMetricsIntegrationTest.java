@@ -22,10 +22,10 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 import org.apache.brooklyn.api.entity.EntitySpec;
+import org.apache.brooklyn.core.entity.EntityAsserts;
 import org.apache.brooklyn.core.test.BrooklynAppLiveTestSupport;
 import org.apache.brooklyn.entity.software.base.SoftwareProcess;
 import org.apache.brooklyn.test.Asserts;
-import org.apache.brooklyn.test.EntityTestUtils;
 import org.testng.annotations.Test;
 import org.apache.brooklyn.location.localhost.LocalhostMachineProvisioningLocation;
 
@@ -48,6 +48,7 @@ public class TomcatServerDisableRetrieveUsageMetricsIntegrationTest extends Broo
 
         // tc2 uses defaults, so will include usage metrics
         Asserts.succeedsEventually(new Runnable() {
+            @Override
             public void run() {
                 assertNotNull(tc2.getAttribute(TomcatServer.CONNECTOR_STATUS));
                 assertNotNull(tc2.getAttribute(TomcatServer.ERROR_COUNT));
@@ -56,8 +57,8 @@ public class TomcatServerDisableRetrieveUsageMetricsIntegrationTest extends Broo
             }});
 
         // tc1 should have status info, but not usage metrics
-        EntityTestUtils.assertAttributeEventuallyNonNull(tc1, TomcatServer.CONNECTOR_STATUS);
-        EntityTestUtils.assertAttributeEqualsContinually(tc1, TomcatServer.ERROR_COUNT, null);
+        EntityAsserts.assertAttributeEventuallyNonNull(tc1, TomcatServer.CONNECTOR_STATUS);
+        EntityAsserts.assertAttributeEqualsContinually(tc1, TomcatServer.ERROR_COUNT, null);
         assertNull(tc1.getAttribute(TomcatServer.REQUEST_COUNT));
         assertNull(tc1.getAttribute(TomcatServer.TOTAL_PROCESSING_TIME));
     }

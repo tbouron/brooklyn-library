@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.brooklyn.entity.webapp.WebAppServiceMethods;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,9 +32,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
 import org.apache.brooklyn.core.entity.Attributes;
-import org.apache.brooklyn.core.entity.Entities;
 import org.apache.brooklyn.entity.software.base.AbstractSoftwareProcessSshDriver;
-import org.apache.brooklyn.entity.software.base.SoftwareProcess;
 import org.apache.brooklyn.entity.webapp.WebAppService;
 import org.apache.brooklyn.location.ssh.SshMachineLocation;
 import org.apache.brooklyn.util.collections.MutableList;
@@ -52,6 +51,7 @@ public class NodeJsWebAppSshDriver extends AbstractSoftwareProcessSshDriver impl
         super(entity, machine);
     }
 
+    @Override
     public NodeJsWebAppServiceImpl getEntity() {
         return (NodeJsWebAppServiceImpl) super.getEntity();
     }
@@ -68,7 +68,7 @@ public class NodeJsWebAppSshDriver extends AbstractSoftwareProcessSshDriver impl
 
     @Override
     public void postLaunch() {
-        String rootUrl = String.format("http://%s:%d/", getHostname(), getHttpPort());
+        String rootUrl = WebAppServiceMethods.inferBrooklynAccessibleRootUrl(entity);
         entity.sensors().set(Attributes.MAIN_URI, URI.create(rootUrl));
         entity.sensors().set(WebAppService.ROOT_URL, rootUrl);
     }
@@ -103,7 +103,7 @@ public class NodeJsWebAppSshDriver extends AbstractSoftwareProcessSshDriver impl
                 .add(BashCommands.ifExecutableElse0("apt-get", BashCommands.chain(
                         BashCommands.installPackage("software-properties-common python-software-properties python g++ make"),
                         BashCommands.sudo("add-apt-repository ppa:chris-lea/node.js"))))
-                .add(BashCommands.installPackage(MutableMap.of("yum", "git nodejs npm", "apt", "git-core nodejs"), null))
+                .add(BashCommands.installPackage(MutableMap.of("yum", "git openssl nodejs npm", "apt", "git-core nodejs npm"), null))
                 .add("mkdir -p \"$HOME/.npm\"")
                 .add(BashCommands.sudo("npm install -g n"))
                 .add(BashCommands.sudo("n " + getVersion()))

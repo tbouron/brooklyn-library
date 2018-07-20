@@ -30,7 +30,7 @@ import org.apache.brooklyn.util.javalang.JavaClassNames;
 /**
  * An {@link org.apache.brooklyn.api.entity.Entity} that represents a single Tomcat instance.
  */
-@Catalog(name="Tomcat Server",
+@Catalog(name="Tomcat 8 Server",
         description="Apache Tomcat is an open source software implementation of the Java Servlet and JavaServer Pages technologies",
         iconUrl="classpath:///tomcat-logo.png")
 @ImplementedBy(Tomcat8ServerImpl.class)
@@ -48,11 +48,13 @@ public interface Tomcat8Server extends TomcatServer {
 
     @SetFromFlag("server.xml")
     ConfigKey<String> SERVER_XML_RESOURCE = ConfigKeys.newStringConfigKey(
-            "tomcat.serverxml", "The file to template and use as the Tomcat process' server.xml",
+            "tomcat.serverxml", 
+            "The file to template and use as the Tomcat's server.xml",
             JavaClassNames.resolveClasspathUrl(Tomcat8Server.class, "tomcat8-server.xml"));
 
     @SetFromFlag("web.xml")
     ConfigKey<String> WEB_XML_RESOURCE = ConfigKeys.newStringConfigKey(
-            "tomcat.webxml", "The file to template and use as the Tomcat process' web.xml",
+            "tomcat.webxml", 
+            "The file to template and use as the Tomcat's web.xml",
             JavaClassNames.resolveClasspathUrl(Tomcat8Server.class, "tomcat8-web.xml"));
 }

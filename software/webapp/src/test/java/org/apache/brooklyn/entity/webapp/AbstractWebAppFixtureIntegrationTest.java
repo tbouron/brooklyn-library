@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.brooklyn.api.entity.Application;
 import org.apache.brooklyn.api.entity.Entity;
-import org.apache.brooklyn.api.entity.EntityLocal;
+import org.apache.brooklyn.api.entity.EntitySpec;
 import org.apache.brooklyn.api.location.LocationSpec;
 import org.apache.brooklyn.api.mgmt.ManagementContext;
 import org.apache.brooklyn.api.mgmt.SubscriptionHandle;
@@ -49,7 +49,6 @@ import org.apache.brooklyn.api.sensor.SensorEvent;
 import org.apache.brooklyn.api.sensor.SensorEventListener;
 import org.apache.brooklyn.core.entity.Entities;
 import org.apache.brooklyn.core.entity.EntityAsserts;
-import org.apache.brooklyn.core.entity.factory.ApplicationBuilder;
 import org.apache.brooklyn.core.entity.trait.Startable;
 import org.apache.brooklyn.core.internal.BrooklynProperties;
 import org.apache.brooklyn.core.test.entity.LocalManagementContextForTests;
@@ -58,7 +57,6 @@ import org.apache.brooklyn.entity.software.base.SoftwareProcess;
 import org.apache.brooklyn.entity.software.base.SoftwareProcessImpl;
 import org.apache.brooklyn.location.localhost.LocalhostMachineProvisioningLocation;
 import org.apache.brooklyn.test.Asserts;
-import org.apache.brooklyn.test.EntityTestUtils;
 import org.apache.brooklyn.test.HttpTestUtils;
 import org.apache.brooklyn.test.support.TestResourceUnavailableException;
 import org.apache.brooklyn.util.collections.MutableMap;
@@ -177,7 +175,7 @@ public abstract class AbstractWebAppFixtureIntegrationTest {
      * @return
      */
     protected TestApplication newTestApplication() {
-        TestApplication ta = ApplicationBuilder.newManagedApp(TestApplication.class, getMgmt());
+        TestApplication ta = mgmt.getEntityManager().createEntity(EntitySpec.create(TestApplication.class));
         applications.add(ta);
         return ta;
     }
@@ -260,6 +258,7 @@ public abstract class AbstractWebAppFixtureIntegrationTest {
         }
         
         Asserts.succeedsEventually(MutableMap.of("timeout", 20*1000), new Runnable() {
+            @Override
             public void run() {
                 Integer requestCount = entity.getAttribute(WebAppService.REQUEST_COUNT);
                 Integer errorCount = entity.getAttribute(WebAppService.ERROR_COUNT);
@@ -291,6 +290,7 @@ public abstract class AbstractWebAppFixtureIntegrationTest {
             // reqs/sec initially zero
             log.info("Waiting for initial avg-requests to be zero...");
             Asserts.succeedsEventually(MutableMap.of("timeout", 20*1000), new Runnable() {
+                @Override
                 public void run() {
                     Double activityValue = entity.getAttribute(WebAppService.REQUESTS_PER_SECOND_IN_WINDOW);
                     assertNotNull(activityValue, "activity not set yet "+activityValue+")");
@@ -299,6 +299,7 @@ public abstract class AbstractWebAppFixtureIntegrationTest {
             
             // apply workload on 1 per sec; reqs/sec should update
             Asserts.succeedsEventually(MutableMap.of("timeout", 30*1000), new Callable<Void>() {
+                @Override
                 public Void call() throws Exception {
                     String url = entity.getAttribute(WebAppService.ROOT_URL) + "does_not_exist";
                     final int desiredMsgsPerSec = 10;
@@ -317,12 +318,13 @@ public abstract class AbstractWebAppFixtureIntegrationTest {
                     }
     
                     Asserts.succeedsEventually(MutableMap.of("timeout", 4000), new Runnable() {
+                        @Override
                         public void run() {
                             Double avgReqs = entity.getAttribute(WebAppService.REQUESTS_PER_SECOND_IN_WINDOW);
                             Integer requestCount = entity.getAttribute(WebAppService.REQUEST_COUNT);
                             
                             log.info("avg-requests="+avgReqs+"; total-requests="+requestCount);
-                            assertEquals(avgReqs.doubleValue(), (double)desiredMsgsPerSec, 3.0d);
+                            assertEquals(avgReqs.doubleValue(), desiredMsgsPerSec, 3.0d);
                             assertEquals(requestCount.intValue(), preRequestCount+reqsSent.get());
                         }});
                     
@@ -334,6 +336,7 @@ public abstract class AbstractWebAppFixtureIntegrationTest {
             Thread.sleep(WebAppServiceMethods.DEFAULT_WINDOW_DURATION.toMilliseconds());
             
             Asserts.succeedsEventually(MutableMap.of("timeout", 10*1000), new Runnable() {
+                @Override
                 public void run() {
                     Double avgReqs = entity.getAttribute(WebAppService.REQUESTS_PER_SECOND_IN_WINDOW);
                     assertNotNull(avgReqs);
@@ -475,11 +478,12 @@ public abstract class AbstractWebAppFixtureIntegrationTest {
         URL resource = getClass().getClassLoader().getResource(war);
         assertNotNull(resource);
         
-        ((EntityLocal)entity).config().set(JavaWebAppService.ROOT_WAR, resource.toString());
+        entity.config().set(JavaWebAppService.ROOT_WAR, resource.toString());
         Entities.start(entity.getApplication(), ImmutableList.of(loc));
         
         //tomcat may need a while to unpack everything
         Asserts.succeedsEventually(MutableMap.of("timeout", 60*1000), new Runnable() {
+            @Override
             public void run() {
                 // TODO get this URL from a WAR file entity
                 HttpTestUtils.assertHttpStatusCodeEquals(Urls.mergePaths(entity.getAttribute(WebAppService.ROOT_URL), urlSubPathToPageToQuery), 200);
@@ -497,10 +501,11 @@ public abstract class AbstractWebAppFixtureIntegrationTest {
         URL resource = getClass().getClassLoader().getResource(war);
         assertNotNull(resource);
         
-        ((EntityLocal)entity).config().set(JavaWebAppService.NAMED_WARS, ImmutableList.of(resource.toString()));
+        entity.config().set(JavaWebAppService.NAMED_WARS, ImmutableList.of(resource.toString()));
         Entities.start(entity.getApplication(), ImmutableList.of(loc));
 
         Asserts.succeedsEventually(MutableMap.of("timeout", 60*1000), new Runnable() {
+            @Override
             public void run() {
                 // TODO get this URL from a WAR file entity
                 HttpTestUtils.assertHttpStatusCodeEquals(Urls.mergePaths(entity.getAttribute(WebAppService.ROOT_URL), urlSubPathToWebApp, urlSubPathToPageToQuery), 200);
@@ -521,6 +526,7 @@ public abstract class AbstractWebAppFixtureIntegrationTest {
         // Test deploying
         entity.deploy(resource.toString(), "myartifactname.war");
         Asserts.succeedsEventually(MutableMap.of("timeout", 60*1000), new Runnable() {
+            @Override
             public void run() {
                 // TODO get this URL from a WAR file entity
                 HttpTestUtils.assertHttpStatusCodeEquals(Urls.mergePaths(entity.getAttribute(WebAppService.ROOT_URL), "myartifactname/", urlSubPathToPageToQuery), 200);
@@ -530,6 +536,7 @@ public abstract class AbstractWebAppFixtureIntegrationTest {
         // And undeploying
         entity.undeploy("/myartifactname");
         Asserts.succeedsEventually(MutableMap.of("timeout", 60*1000), new Runnable() {
+            @Override
             public void run() {
                 // TODO get this URL from a WAR file entity
                 HttpTestUtils.assertHttpStatusCodeEquals(Urls.mergePaths(entity.getAttribute(WebAppService.ROOT_URL), "myartifactname", urlSubPathToPageToQuery), 404);
