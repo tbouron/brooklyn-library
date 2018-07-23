@@ -80,3 +80,10 @@ node(label: 'ubuntu') {
         }
     }
 }
+
+properties([
+    pipelineTriggers([
+        githubPush(),
+        issueCommentTrigger('.*retest this please.*')
+    ])
+])
