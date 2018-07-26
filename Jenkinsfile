@@ -29,23 +29,25 @@ node(label: 'ubuntu') {
             }
 
             stage('Prepare environment') {
-                echo 'Creating maven cache ...'
-                sh 'mkdir -p ${WORKSPACE}/.m2'
                 echo 'Building docker image for test environment ...'
                 environmentDockerImage = docker.build('brooklyn:${DOCKER_TAG}')
             }
 
             stage('Run tests') {
-                environmentDockerImage.inside('-i --name brooklyn-${DOCKER_TAG} -v ${WORKSPACE}/.m2:/root/.m2 -v ${WORKSPACE}:/usr/build -w /usr/build') {
-                    sh 'mvn clean install'
+                // Run docker as the current user. This requires the uid as well as setting up the user home for the Docker container.
+                // See section "Running as non-root" at https://hub.docker.com/_/maven/
+                environmentDockerImage.inside('-i --name brooklyn-${DOCKER_TAG} -u $(id -u ${whoami}) -v ${HOME}/.m2:/var/maven/.m2 -v ${WORKSPACE}:/usr/build -w /usr/build -e MAVEN_CONFIG=/var/maven/.m2') {
+                    sh 'mvn clean install -Duser.home=/var/maven'
                 }
             }
 
             // Conditional stage to deploy artifacts, when not building a PR
             if (env.CHANGE_ID == null) {
                 stage('Deploy artifacts') {
-                    environmentDockerImage.inside('-i --name brooklyn-${DOCKER_TAG} -v ${WORKSPACE}/.m2:/root/.m2 -v ${WORKSPACE}:/usr/build -w /usr/build') {
-                        sh 'mvn deploy -DskipTests'
+                    // Run docker as the current user. This requires the uid as well as setting up the user home for the Docker container.
+                    // See section "Running as non-root" at https://hub.docker.com/_/maven/
+                    environmentDockerImage.inside('-i --name brooklyn-${DOCKER_TAG} -u $(id -u ${whoami}) -v ${HOME}/.m2:/var/maven/.m2 -v ${WORKSPACE}:/usr/build -w /usr/build -e MAVEN_CONFIG=/var/maven/.m2') {
+                        sh 'mvn deploy -DskipTests -Duser.home=/var/maven'
                     }
                 }
 
@@ -75,7 +77,7 @@ node(label: 'ubuntu') {
                 $class: 'Mailer',
                 notifyEveryUnstableBuild: true,
                 recipients: 'dev@brooklyn.apache.org',
-                sendToIndividuals: false
+                sendToIndividuals: false // TODO: Change to true when finish test
             ])
         }
     }
