@@ -24,6 +24,8 @@ node(label: 'ubuntu') {
         def dockerTag = env.BUILD_TAG.replace('%2F', '-')
 
         withEnv(["DOCKER_TAG=${dockerTag}"]) {
+            // TODO: Add timeout
+
             stage('Clone repository') {
                 checkout scm
             }
@@ -36,8 +38,8 @@ node(label: 'ubuntu') {
             stage('Run tests') {
                 // Run docker as the current user. This requires the uid as well as setting up the user home for the Docker container.
                 // See section "Running as non-root" at https://hub.docker.com/_/maven/
-                environmentDockerImage.inside('-i --name brooklyn-${DOCKER_TAG} -u $(id -u ${whoami}) -v ${HOME}/.m2:/var/maven/.m2 -v ${WORKSPACE}:/usr/build -w /usr/build -e MAVEN_CONFIG=/var/maven/.m2') {
-                    sh 'mvn clean install -Duser.home=/var/maven'
+                environmentDockerImage.inside('-i --name brooklyn-${DOCKER_TAG} -u $(id -u ${whoami}) -v ${HOME}:/var/maven -v ${WORKSPACE}:/usr/build -w /usr/build -e MAVEN_CONFIG=/var/maven/.m2') {
+                    sh 'mvn clean install -Duser.home=/var/maven -Duser.name=$(whoami)'
                 }
             }
 
@@ -46,8 +48,9 @@ node(label: 'ubuntu') {
                 stage('Deploy artifacts') {
                     // Run docker as the current user. This requires the uid as well as setting up the user home for the Docker container.
                     // See section "Running as non-root" at https://hub.docker.com/_/maven/
-                    environmentDockerImage.inside('-i --name brooklyn-${DOCKER_TAG} -u $(id -u ${whoami}) -v ${HOME}/.m2:/var/maven/.m2 -v ${WORKSPACE}:/usr/build -w /usr/build -e MAVEN_CONFIG=/var/maven/.m2') {
-                        sh 'mvn deploy -DskipTests -Duser.home=/var/maven'
+                    environmentDockerImage.inside('-i --name brooklyn-${DOCKER_TAG} -u $(id -u ${whoami}) -v ${HOME}:/var/maven -v ${WORKSPACE}:/usr/build -w /usr/build -e MAVEN_CONFIG=/var/maven/.m2') {
+                        // Skip the compilation and tests as it is already done in the previous step
+                        sh 'mvn deploy -Dmaven.main.skip -DskipTests -Duser.home=/var/maven -Duser.name=$(whoami)'
                     }
                 }
 
